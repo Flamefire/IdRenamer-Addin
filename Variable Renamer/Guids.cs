@@ -2,7 +2,7 @@
 // MUST match guids.h
 using System;
 
-namespace NoCompany.Variable_Renamer
+namespace Variable_Renamer
 {
     static class GuidList
     {

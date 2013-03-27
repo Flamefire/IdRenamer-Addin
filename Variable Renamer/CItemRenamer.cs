@@ -1,10 +1,11 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Text.RegularExpressions;
 using EnvDTE;
 using EnvDTE80;
 
-namespace NoCompany.Variable_Renamer
+namespace Variable_Renamer
 {
     enum ENamingStyle
     {
@@ -20,6 +21,108 @@ namespace NoCompany.Variable_Renamer
         public String RemovePrefix;
         public String Prefix;
         public ENamingStyle NamingStyle;
+    }
+
+    class CRenameItem
+    {
+        public string Name, NewName;
+        public CodeElement2 Element;
+        public CRenameItemClass Parent;
+    }
+
+    class CRenameItemSub : CRenameItem {}
+
+    class CRenameFunction : CRenameItem
+    {
+        public readonly List<CRenameItem> Parameters = new List<CRenameItem>();
+        public string Text = null;
+        private EditPoint _StartPt;
+        private TextPoint _EndPt;
+        private List<string> _Strings = new List<string>();
+        private List<string> _Comments = new List<string>();
+        private static readonly Regex _ReString = new Regex(@"""(\\.|[^\\""])*""", RegexOptions.Compiled | RegexOptions.Singleline);
+        private static readonly Regex _ReVarbatimString = new Regex("@\"(\"\"|[^\"])*\"", RegexOptions.Compiled | RegexOptions.Multiline);
+        private static readonly Regex _ReCommentSl = new Regex(@"//[^\r\n]*\r\n", RegexOptions.Compiled | RegexOptions.Singleline);
+        private static readonly Regex _ReCommentMl = new Regex(@"/\*.*?\*/", RegexOptions.Compiled | RegexOptions.Multiline);
+
+        public String GetText()
+        {
+            CodeFunction2 func = (CodeFunction2)Element;
+            _StartPt = func.GetStartPoint(vsCMPart.vsCMPartBody).CreateEditPoint();
+            _EndPt = func.GetEndPoint(vsCMPart.vsCMPartBody);
+            return _StartPt.GetText(_EndPt);
+        }
+
+        public void SetText(String text)
+        {
+            _StartPt.ReplaceText(_EndPt, text, (int)vsEPReplaceTextOptions.vsEPReplaceTextKeepMarkers);
+        }
+
+        public void RemoveTextComments(ref String text)
+        {
+            _Strings.Clear();
+            _Comments.Clear();
+            text = _ReString.Replace(text, delegate(Match m)
+                {
+                    _Strings.Add(m.Value);
+                    return "\"ReplacedStr:::" + (_Strings.Count - 1) + ":::\"";
+                });
+            text = _ReVarbatimString.Replace(text, delegate(Match m)
+                {
+                    _Strings.Add(m.Value);
+                    return "\"ReplacedStr:::" + (_Strings.Count - 1) + ":::\"";
+                });
+            text = _ReCommentSl.Replace(text, delegate(Match m)
+                {
+                    _Comments.Add(m.Value);
+                    return "//ReplacedCom:::" + (_Comments.Count - 1) + ":::;\r\n";
+                });
+            text = _ReCommentMl.Replace(text, delegate(Match m)
+                {
+                    _Comments.Add(m.Value);
+                    return "//ReplacedCom:::" + (_Comments.Count - 1) + ":::;\r\n";
+                });
+        }
+
+        public void RestoreTextComments(ref String text)
+        {
+            for (int i = 0; i < _Strings.Count; i++)
+                text = text.Replace("\"ReplacedStr:::" + i + ":::\"", _Strings[i]);
+            for (int i = 0; i < _Comments.Count; i++)
+                text = text.Replace("//ReplacedCom:::" + i + ":::;\r\n", _Comments[i]);
+        }
+    }
+
+    class CRenameItemClass : CRenameItem
+    {
+        public readonly List<CRenameFunction> Functions = new List<CRenameFunction>();
+        public readonly List<CRenameItem> Variables = new List<CRenameItem>();
+        public readonly List<CRenameItem> Properties = new List<CRenameItem>();
+        public readonly List<CRenameItemClass> Classes = new List<CRenameItemClass>();
+        public readonly List<CRenameItemClass> Interfaces = new List<CRenameItemClass>();
+        public readonly List<CRenameItemSub> Structs = new List<CRenameItemSub>();
+        public readonly List<CRenameItemSub> Enums = new List<CRenameItemSub>();
+
+        public bool MemberExists(string newName, string oldName = "")
+        {
+            return Functions.Any(item => item.NewName == newName && item.Name != oldName) ||
+                   Variables.Any(item => item.NewName == newName && item.Name != oldName) ||
+                   Properties.Any(item => item.NewName == newName && item.Name != oldName);
+        }
+
+        public bool IdExists(string newName, string oldName = "")
+        {
+            return MemberExists(newName, oldName) || IdExists2(newName, oldName);
+        }
+
+        private bool IdExists2(string newName, string oldName = "")
+        {
+            return Classes.Any(item => item.NewName == newName && item.Name != oldName) ||
+                   Interfaces.Any(item => item.NewName == newName && item.Name != oldName) ||
+                   Structs.Any(item => item.NewName == newName && item.Name != oldName) ||
+                   Enums.Any(item => item.NewName == newName && item.Name != oldName) ||
+                   (Parent != null && Parent.IdExists2(newName, oldName));
+        }
     }
 
     class CRenameRuleSet
@@ -51,8 +154,6 @@ namespace NoCompany.Variable_Renamer
             Parameter.NamingStyle = ENamingStyle.LowerCamelCase;
             LokalVariable.NamingStyle = ENamingStyle.LowerCamelCase;
             LokalConst.NamingStyle = ENamingStyle.LowerCamelCase;
-            LokalVariable.Prefix = "locVar";
-            LokalConst.Prefix = "locConst";
             Const[Priv].Prefix = "_";
             Field[Priv].Prefix = "_";
             Method[Priv].Prefix = "_";
@@ -71,20 +172,20 @@ namespace NoCompany.Variable_Renamer
         private const int Pub = 2;
         private readonly DTE2 _Dte;
         private readonly OutputWindowPane _OutputWindow;
-        private readonly CRenameRuleSet _RuleSet = new CRenameRuleSet();
+        private CRenameRuleSet _RuleSet;
         private const string _Id = "[a-z_][a-z0-9_\\.]*";
         private static readonly Regex _ReLocVar = new Regex(@"(?<=[\{\(,;]\s*)((const\s+)?" + _Id + "(<" + _Id + @">)?)\s*(\[\])?\s+(" + _Id + @")(?=\s*([=,;]|( in )))",
                                                             RegexOptions.Compiled | RegexOptions.IgnoreCase | RegexOptions.Singleline);
-        private static readonly Regex _ReString = new Regex(@"""(\\.|[^\\""])*""", RegexOptions.Compiled | RegexOptions.Singleline);
-        private static readonly Regex _ReVarbatimString = new Regex("@\"(\"\"|[^\"])*\"", RegexOptions.Compiled | RegexOptions.Multiline);
-        private static readonly Regex _ReCommentSl = new Regex(@"//[^\r\n]*\r\n", RegexOptions.Compiled | RegexOptions.Singleline);
-        private static readonly Regex _ReCommentMl = new Regex(@"/\*.*?\*/", RegexOptions.Compiled | RegexOptions.Multiline);
         private static readonly Regex _ReUnderScore = new Regex("(?<=[a-z0-9])_[a-z0-9]", RegexOptions.Compiled | RegexOptions.IgnoreCase);
         private static readonly Regex _ReMultiCaps = new Regex("[A-Z]{2,}", RegexOptions.Compiled);
         private static readonly Regex _ReEndsWithNoCaps = new Regex("[a-z]$", RegexOptions.Compiled);
 
+        private CRenameItemClass _RenameItems;
+        private CRenameItemClass _CurParent;
+
         private readonly List<String> _FoundTypes = new List<string>();
-        private CTypeResolver _TypeResolver = new CTypeResolver();
+
+        private readonly CTypeResolver _TypeResolver = new CTypeResolver();
         //Strings
         //comments
         public CItemRenamer(DTE2 dte)
@@ -109,11 +210,32 @@ namespace NoCompany.Variable_Renamer
 
         private void Execute()
         {
-            foreach (Project project in _Dte.Solution.Projects)
-            {
-                Message(project.Kind);
-                IterateProjectItems(project.ProjectItems);
-            }
+            BuildClassTree();
+            _RuleSet = new CRenameRuleSet();
+            SetNewNames(_RenameItems);
+            CheckChanges();
+
+            _RuleSet.Parameter.Prefix = "paramitr";
+            _RuleSet.LokalVariable.Prefix = "lokVaritr";
+            _RuleSet.LokalConst.Prefix = "lokConstitr";
+            _RuleSet.Interface.Prefix = "I";
+            _RuleSet.Class.Prefix = "C";
+            _RuleSet.Enum.Prefix = "E";
+            _RuleSet.Struct.Prefix = "S";
+
+            /* public SRenameRule
+            Parameter,
+            LokalVariable,
+            LokalConst,
+            Interface,
+            Class,
+            Enum,
+            Struct;
+        public SRenameRule[]
+            Const,
+            Field,
+            Property,
+            Method;*/
             Message("\r\nFound local var types:");
             foreach (string type in _FoundTypes)
             {
@@ -121,6 +243,18 @@ namespace NoCompany.Variable_Renamer
                     Message(type);
             }
             Message("IMPORTANT: Check if all found types above are actual types otherwhise use undo and fix addin!");
+        }
+
+        #region BuildClassTree
+        private void BuildClassTree()
+        {
+            _RenameItems = new CRenameItemClass();
+            _CurParent = _RenameItems;
+            foreach (Project project in _Dte.Solution.Projects)
+            {
+                Message(project.Kind);
+                IterateProjectItems(project.ProjectItems);
+            }
         }
 
         private void IterateProjectItems(ProjectItems projectItems)
@@ -149,151 +283,120 @@ namespace NoCompany.Variable_Renamer
                 try
                 {
                     CodeElement2 element = objCodeElement as CodeElement2;
+                    CRenameItem cItem = null;
+                    CRenameItemClass oldParent;
                     switch (element.Kind)
                     {
                         case vsCMElement.vsCMElementVariable:
-                            RenameVariable(element);
+                            cItem = new CRenameItem();
+                            _CurParent.Variables.Add(cItem);
                             break;
                         case vsCMElement.vsCMElementProperty:
-                            RenameProperty(element);
+                            cItem = new CRenameItem();
+                            _CurParent.Properties.Add(cItem);
                             break;
                         case vsCMElement.vsCMElementFunction:
-                            RenameMethod(element);
+                            cItem = new CRenameFunction();
+                            CodeFunction2 func = (CodeFunction2)element;
+
+                            foreach (CodeElement2 param in func.Children)
+                            {
+                                if (param.Kind == vsCMElement.vsCMElementParameter)
+                                {
+                                    CRenameItem cItem2 = new CRenameItem {Name = param.Name, Element = param, Parent = _CurParent};
+                                    ((CRenameFunction)cItem).Parameters.Add(cItem2);
+                                }
+                                else
+                                    Message("Found a non parameter in method " + element.Name + ":" + param.Name + ":" + param.Kind);
+                            }
+                            _CurParent.Functions.Add((CRenameFunction)cItem);
                             break;
                         case vsCMElement.vsCMElementParameter:
-                            DoRename(element, _RuleSet.Parameter);
-                            break;
+                            throw new Exception("Found a parameter but did not expect one!");
                         case vsCMElement.vsCMElementInterface:
-                            DoRename(element, _RuleSet.Interface);
+                            cItem = new CRenameItemClass();
+                            _CurParent.Interfaces.Add((CRenameItemClass)cItem);
+                            oldParent = _CurParent;
+                            _CurParent = (CRenameItemClass)cItem;
+                            IterateCodeElements(((CodeInterface2)element).Members);
+                            _CurParent = oldParent;
                             break;
                         case vsCMElement.vsCMElementEnum:
-                            DoRename(element, _RuleSet.Enum);
+                            cItem = new CRenameItemSub();
+                            _CurParent.Enums.Add((CRenameItemSub)cItem);
                             break;
                         case vsCMElement.vsCMElementStruct:
-                            DoRename(element, _RuleSet.Struct);
+                            cItem = new CRenameItemSub();
+                            _CurParent.Structs.Add((CRenameItemSub)cItem);
                             break;
                         case vsCMElement.vsCMElementNamespace:
                             CodeNamespace objCodeNamespace = objCodeElement as CodeNamespace;
                             IterateCodeElements(objCodeNamespace.Members);
                             break;
                         case vsCMElement.vsCMElementClass:
-                            DoRename(element, _RuleSet.Class);
-                            CodeClass objCodeClass = objCodeElement as CodeClass;
-                            IterateCodeElements(objCodeClass.Members);
+                            cItem = new CRenameItemClass();
+                            _CurParent.Classes.Add((CRenameItemClass)cItem);
+                            oldParent = _CurParent;
+                            _CurParent = (CRenameItemClass)cItem;
+                            IterateCodeElements(((CodeClass2)element).Members);
+                            _CurParent = oldParent;
                             break;
+                    }
+                    if (cItem != null)
+                    {
+                        try
+                        {
+                            cItem.Element = element;
+                            cItem.Name = element.Name;
+                            cItem.Parent = _CurParent;
+                        }
+                        catch {}
                     }
                 }
                 catch {}
             }
         }
+        #endregion
 
-        private void RenameVariable(CodeElement2 element)
+        #region GetNewName
+        private string GetNewName(CodeFunction2 func)
         {
-            CodeVariable2 variable = (CodeVariable2)element;
+            return GetNewName((CodeElement2)func, _RuleSet.Field, func.Access);
+        }
+
+        private string GetNewName(CodeVariable2 variable)
+        {
             if (variable.IsConstant)
-                DoRename(element, _RuleSet.Const, variable.Access);
-            else
-                DoRename(element, _RuleSet.Field, variable.Access);
+                return GetNewName((CodeElement2)variable, _RuleSet.Const, variable.Access);
+            return GetNewName((CodeElement2)variable, _RuleSet.Field, variable.Access);
         }
 
-        private void RenameProperty(CodeElement2 element)
+        private string GetNewName(CodeProperty2 property)
         {
-            CodeProperty2 func = (CodeProperty2)element;
-            DoRename(element, _RuleSet.Property, func.Access);
+            return GetNewName((CodeElement2)property, _RuleSet.Property, property.Access);
         }
 
-        private void RenameMethod(CodeElement2 element)
-        {
-            CodeFunction2 func = (CodeFunction2)element;
-            DoRename(element, _RuleSet.Method, func.Access);
-            EditPoint startPoint = func.GetStartPoint(vsCMPart.vsCMPartBody).CreateEditPoint();
-            TextPoint endPoint = func.GetEndPoint(vsCMPart.vsCMPartBody);
-            string funcText = "{" + startPoint.GetText(endPoint);
-
-            #region Remove all strings and comments
-            List<string> strings = new List<string>();
-            List<string> comments = new List<string>();
-            funcText = _ReString.Replace(funcText, delegate(Match m)
-                {
-                    strings.Add(m.Value);
-                    return "\"ReplacedStr:::" + (strings.Count - 1) + ":::\"";
-                });
-            funcText = _ReVarbatimString.Replace(funcText, delegate(Match m)
-                {
-                    strings.Add(m.Value);
-                    return "\"ReplacedStr:::" + (strings.Count - 1) + ":::\"";
-                });
-            funcText = _ReCommentSl.Replace(funcText, delegate(Match m)
-                {
-                    comments.Add(m.Value);
-                    return "//ReplacedCom:::" + (comments.Count - 1) + ":::;\r\n";
-                });
-            funcText = _ReCommentMl.Replace(funcText, delegate(Match m)
-                {
-                    comments.Add(m.Value);
-                    return "//ReplacedCom:::" + (comments.Count - 1) + ":::;\r\n";
-                });
-            #endregion
-
-            MatchCollection locVars = _ReLocVar.Matches(funcText);
-            if (locVars.Count > 0)
-            {
-                Message("Method " + element.Name + ":");
-                //First capture all vars, rename, check for 2 vars with same name and possible colliding space
-                foreach (Match match in locVars)
-                {
-                    string type = match.Groups[1].Value.ToLower();
-                    string name = match.Groups[5].Value;
-                    if (type == "return" || type == "else" || type == "in" || type == "out" || type == "ref")
-                        continue;
-                    type = match.Groups[1].Value;
-                    if (!_FoundTypes.Contains(type))
-                        _FoundTypes.Add(type);
-                    Message(name + "\t(" + type + ")");
-                    string newName;
-                    if (match.Groups[2].Value != "")
-                        newName = DoRename(name, _RuleSet.LokalConst);
-                    else
-                        newName = DoRename(name, _RuleSet.LokalVariable);
-                    if (name != newName)
-                        funcText = Regex.Replace(funcText, @"(?<! new )(?<!\w|\.)" + Regex.Escape(name) + @"(?=( in )|\b(?!\s+[a-zA-Z_]))", newName, RegexOptions.Singleline);
-                }
-                //Restore strings and comments
-                for (int i = 0; i < strings.Count; i++)
-                    funcText = funcText.Replace("\"ReplacedStr:::" + i + ":::\"", strings[i]);
-                for (int i = 0; i < comments.Count; i++)
-                    funcText = funcText.Replace("//ReplacedCom:::" + i + ":::;\r\n", comments[i]);
-
-                startPoint.ReplaceText(endPoint, funcText.Substring(1), 0);
-            }
-            IterateCodeElements(func.Parameters);
-        }
-
-        private static void DoRename(CodeElement2 element, SRenameRule[] rules, vsCMAccess access)
+        private string GetNewName(CodeElement2 element, SRenameRule[] rules, vsCMAccess access)
         {
             switch (access)
             {
                 case vsCMAccess.vsCMAccessPrivate:
-                    DoRename(element, rules[Priv]);
-                    break;
+                    return GetNewName(element, rules[Priv]);
                 case vsCMAccess.vsCMAccessProtected:
-                    DoRename(element, rules[Prot]);
-                    break;
+                    return GetNewName(element, rules[Prot]);
                 case vsCMAccess.vsCMAccessPublic:
-                    DoRename(element, rules[Pub]);
-                    break;
+                    return GetNewName(element, rules[Pub]);
             }
+            Message("Found unknown access modifier for " + element.Name + " " + access);
+            return element.Name;
         }
 
-        private static void DoRename(CodeElement2 element, SRenameRule rule)
+        private static string GetNewName(CodeElement2 element, SRenameRule rule)
         {
-            string newName = DoRename(element.Name, rule);
-
-            //if (!element.Name.Equals(newName))
-            //element.RenameSymbol(newName);
+            return GetNewName(element.Name, rule);
         }
 
-        private static string DoRename(string theString, SRenameRule rule)
+        private static string GetNewName(string theString, SRenameRule rule)
         {
             if (rule.DontChange)
                 return theString;
@@ -362,6 +465,178 @@ namespace NoCompany.Variable_Renamer
                 return;
             if (!theString.StartsWith(prefix))
                 theString = prefix + theString;
+        }
+        #endregion
+
+        #region SetNewNames
+        private void SetNewName(CRenameItem item, SRenameRule rule)
+        {
+            item.NewName = GetNewName(item.Name, rule);
+        }
+
+        private void SetNewNames(CRenameItemClass renameItem)
+        {
+            foreach (var item in renameItem.Classes)
+            {
+                SetNewName(item, _RuleSet.Class);
+                SetNewNames(item);
+            }
+            foreach (var item in renameItem.Interfaces)
+            {
+                SetNewName(item, _RuleSet.Interface);
+                SetNewNames(item);
+            }
+            foreach (var item in renameItem.Enums)
+                SetNewName(item, _RuleSet.Enum);
+            foreach (var item in renameItem.Structs)
+                SetNewName(item, _RuleSet.Struct);
+
+            foreach (var item in renameItem.Properties)
+                item.NewName = GetNewName((CodeProperty2)item.Element);
+            foreach (var item in renameItem.Variables)
+                item.NewName = GetNewName((CodeVariable2)item.Element);
+            foreach (var item in renameItem.Functions)
+            {
+                item.NewName = GetNewName((CodeFunction2)item.Element);
+                foreach (var param in item.Parameters)
+                    SetNewName(param, _RuleSet.Parameter);
+            }
+        }
+        #endregion
+
+        private delegate bool HandleItem(CRenameItem item);
+
+        private void RenameSymbol(CRenameItem item)
+        {
+            if (item.Name != item.NewName)
+                item.Element.RenameSymbol(item.NewName);
+        }
+
+        private void ApplyChanges()
+        {
+            foreach (var item in _RenameItems.Classes)
+                RenameSymbol(item);
+        }
+
+        private bool CheckChanges()
+        {
+            return TraverseItems(CheckChanges);
+        }
+
+        private bool CheckChanges(CRenameItem item)
+        {
+            bool result;
+            if (item is CRenameItemClass || item is CRenameItemSub)
+                result = !item.Parent.IdExists(item.NewName, item.Name);
+            else
+                result = !item.Parent.MemberExists(item.NewName, item.Name);
+            if (!result)
+            {
+                Message("Cannot rename " + item.Name + " to " + item.NewName);
+                if (item.Element.ProjectItem.Document.Windows.Count == 0)
+                    item.Element.ProjectItem.Open();
+                item.Element.StartPoint.TryToShow(vsPaneShowHow.vsPaneShowTop);
+            }
+            return true;
+        }
+
+        private bool TraverseItems(HandleItem callBack)
+        {
+            return TraverseItems(_RenameItems, callBack);
+        }
+
+        private bool TraverseItems(CRenameItemClass itemClass, HandleItem callBack)
+        {
+            foreach (var item in itemClass.Classes)
+            {
+                if (!callBack(item))
+                    return false;
+                TraverseItems(item, callBack);
+            }
+            foreach (var item in itemClass.Interfaces)
+            {
+                if (!callBack(item))
+                    return false;
+                TraverseItems(item, callBack);
+            }
+            if (itemClass.Enums.Any(item => !callBack(item)))
+                return false;
+            if (itemClass.Structs.Any(item => !callBack(item)))
+                return false;
+            if (itemClass.Variables.Any(item => !callBack(item)))
+                return false;
+            if (itemClass.Properties.Any(item => !callBack(item)))
+                return false;
+            foreach (var item in itemClass.Functions)
+            {
+                if (item.Parameters.Any(param => !callBack(param)))
+                    return false;
+                if (!callBack(item))
+                    return false;
+            }
+            return true;
+        }
+
+        private bool TypeExists(string type)
+        {
+            return _TypeResolver.IsType(type) || TypeExistsInClass(type, _RenameItems);
+        }
+
+        private bool TypeExistsInClass(string type, CRenameItemClass cItemClass)
+        {
+            if (cItemClass.Enums.Any(c => c.Name == type))
+                return true;
+            if (cItemClass.Structs.Any(c => c.Name == type))
+                return true;
+            foreach (var c in cItemClass.Interfaces)
+            {
+                if (c.Name == type)
+                    return true;
+                if (TypeExistsInClass(type, c))
+                    return true;
+            }
+            foreach (var c in cItemClass.Classes)
+            {
+                if (c.Name == type)
+                    return true;
+                if (TypeExistsInClass(type, c))
+                    return true;
+            }
+            return false;
+        }
+
+        private void RenameMethod(CRenameFunction func)
+        {
+            string funcText = "{" + func.GetText();
+            func.RemoveTextComments(ref funcText);
+
+            MatchCollection locVars = _ReLocVar.Matches(funcText);
+            if (locVars.Count > 0)
+            {
+                Message("Method " + func.Name + ":");
+                //First capture all vars, rename, check for 2 vars with same name and possible colliding space
+                foreach (Match match in locVars)
+                {
+                    string type = match.Groups[1].Value.ToLower();
+                    string name = match.Groups[5].Value;
+                    if (type == "return" || type == "else" || type == "in" || type == "out" || type == "ref")
+                        continue;
+                    type = match.Groups[1].Value;
+                    if (!_FoundTypes.Contains(type))
+                        _FoundTypes.Add(type);
+                    Message(name + "\t(" + type + ")");
+                    string newName;
+                    if (match.Groups[2].Value != "")
+                        newName = GetNewName(name, _RuleSet.LokalConst);
+                    else
+                        newName = GetNewName(name, _RuleSet.LokalVariable);
+                    if (name != newName)
+                        funcText = Regex.Replace(funcText, @"(?<! new )(?<!\w|\.)" + Regex.Escape(name) + @"(?=( in )|\b(?!\s+[a-zA-Z_]))", newName, RegexOptions.Singleline);
+                }
+
+                func.RestoreTextComments(ref funcText);
+                func.SetText(funcText.Substring(1));
+            }
         }
 
         private void Message(string msg)
