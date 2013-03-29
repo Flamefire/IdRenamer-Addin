@@ -1,4 +1,23 @@
-﻿using System;
+﻿#region license
+/*
+    This file is part of the item renamer Add-In for VS ("Add-In").
+
+    The Add-In is free software: you can redistribute it and/or modify
+    it under the terms of the GNU General Public License as published by
+    the Free Software Foundation, either version 3 of the License, or
+    (at your option) any later version.
+
+    The Add-In is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+    GNU General Public License for more details.
+
+    You should have received a copy of the GNU General Public License
+    along with Foobar.  If not, see <http://www.gnu.org/licenses/>.
+ */
+#endregion
+
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text.RegularExpressions;
@@ -38,8 +57,8 @@ namespace Variable_Renamer
         public string Text = null;
         private EditPoint _StartPt;
         private TextPoint _EndPt;
-        private List<string> _Strings = new List<string>();
-        private List<string> _Comments = new List<string>();
+        private readonly List<string> _Strings = new List<string>();
+        private readonly List<string> _Comments = new List<string>();
         private static readonly Regex _ReString = new Regex(@"""(\\.|[^\\""])*""", RegexOptions.Compiled | RegexOptions.Singleline);
         private static readonly Regex _ReVarbatimString = new Regex("@\"(\"\"|[^\"])*\"", RegexOptions.Compiled | RegexOptions.Multiline);
         private static readonly Regex _ReCommentSl = new Regex(@"//[^\r\n]*\r\n", RegexOptions.Compiled | RegexOptions.Singleline);
@@ -93,7 +112,7 @@ namespace Variable_Renamer
         }
     }
 
-    class CRenameItemClass : CRenameItem
+    class CRenameItemClassBase : CRenameItem
     {
         public readonly List<CRenameFunction> Functions = new List<CRenameFunction>();
         public readonly List<CRenameItem> Variables = new List<CRenameItem>();
@@ -103,25 +122,45 @@ namespace Variable_Renamer
         public readonly List<CRenameItemSub> Structs = new List<CRenameItemSub>();
         public readonly List<CRenameItemSub> Enums = new List<CRenameItemSub>();
 
-        public bool MemberExists(string newName, string oldName = "")
+        public bool MemberExistsInt(string newName, string oldName = "")
         {
             return Functions.Any(item => item.NewName == newName && item.Name != oldName) ||
                    Variables.Any(item => item.NewName == newName && item.Name != oldName) ||
                    Properties.Any(item => item.NewName == newName && item.Name != oldName);
         }
 
-        public bool IdExists(string newName, string oldName = "")
+        public bool IdExistsInt(string newName, string oldName = "")
         {
-            return MemberExists(newName, oldName) || IdExists2(newName, oldName);
+            return MemberExistsInt(newName, oldName) || IdExistsInt2(newName, oldName);
         }
 
-        private bool IdExists2(string newName, string oldName = "")
+        private bool IdExistsInt2(string newName, string oldName = "")
         {
             return Classes.Any(item => item.NewName == newName && item.Name != oldName) ||
                    Interfaces.Any(item => item.NewName == newName && item.Name != oldName) ||
                    Structs.Any(item => item.NewName == newName && item.Name != oldName) ||
                    Enums.Any(item => item.NewName == newName && item.Name != oldName) ||
-                   (Parent != null && Parent.IdExists2(newName, oldName));
+                   (Parent != null && Parent.IdExistsInt2(newName, oldName));
+        }
+    }
+
+    class CRenameItemClass : CRenameItemClassBase
+    {
+        public readonly CRenameItemClassBase InheritedStuff;
+
+        public CRenameItemClass()
+        {
+            InheritedStuff = new CRenameItemClassBase {Parent = this};
+        }
+
+        public bool MemberExists(string newName, string oldName = "")
+        {
+            return MemberExistsInt(newName, oldName) || InheritedStuff.MemberExistsInt(newName, oldName);
+        }
+
+        public bool IdExists(string newName, string oldName = "")
+        {
+            return InheritedStuff.IdExistsInt(newName, oldName);
         }
     }
 
@@ -181,7 +220,7 @@ namespace Variable_Renamer
         private static readonly Regex _ReEndsWithNoCaps = new Regex("[a-z]$", RegexOptions.Compiled);
 
         private CRenameItemClass _RenameItems;
-        private CRenameItemClass _CurParent;
+        private CRenameItemClassBase _CurParent;
 
         private readonly List<String> _FoundTypes = new List<string>();
 
@@ -251,10 +290,7 @@ namespace Variable_Renamer
             _RenameItems = new CRenameItemClass();
             _CurParent = _RenameItems;
             foreach (Project project in _Dte.Solution.Projects)
-            {
-                Message(project.Kind);
                 IterateProjectItems(project.ProjectItems);
-            }
         }
 
         private void IterateProjectItems(ProjectItems projectItems)
@@ -264,7 +300,7 @@ namespace Variable_Renamer
                 if (item.Kind == Constants.vsProjectItemKindPhysicalFile && item.Name.EndsWith(".cs"))
                 {
                     Message("File " + item.Name + ":");
-                    IterateCodeElements(item.FileCodeModel.CodeElements);
+                    IterateCodeElements(item.FileCodeModel.CodeElements, false);
                 }
                 if (item.SubProject != null)
                     IterateProjectItems(item.SubProject.ProjectItems);
@@ -274,8 +310,9 @@ namespace Variable_Renamer
         }
 
         //Iterate through all the code elements in the provided element
-        private void IterateCodeElements(CodeElements colCodeElements)
+        private void IterateCodeElements(CodeElements colCodeElements, bool gettingInherited)
         {
+            //Check for nonmutable object inheritance
             if (colCodeElements == null)
                 return;
             foreach (CodeElement objCodeElement in colCodeElements)
@@ -284,7 +321,7 @@ namespace Variable_Renamer
                 {
                     CodeElement2 element = objCodeElement as CodeElement2;
                     CRenameItem cItem = null;
-                    CRenameItemClass oldParent;
+                    CRenameItemClassBase oldParent;
                     switch (element.Kind)
                     {
                         case vsCMElement.vsCMElementVariable:
@@ -299,15 +336,18 @@ namespace Variable_Renamer
                             cItem = new CRenameFunction();
                             CodeFunction2 func = (CodeFunction2)element;
 
-                            foreach (CodeElement2 param in func.Children)
+                            if (!gettingInherited)
                             {
-                                if (param.Kind == vsCMElement.vsCMElementParameter)
+                                foreach (CodeElement2 param in func.Children)
                                 {
-                                    CRenameItem cItem2 = new CRenameItem {Name = param.Name, Element = param, Parent = _CurParent};
-                                    ((CRenameFunction)cItem).Parameters.Add(cItem2);
+                                    if (param.Kind == vsCMElement.vsCMElementParameter)
+                                    {
+                                        CRenameItem cItem2 = new CRenameItem {Name = param.Name, Element = param, Parent = (CRenameItemClass)_CurParent};
+                                        ((CRenameFunction)cItem).Parameters.Add(cItem2);
+                                    }
+                                    else
+                                        Message("Found a non parameter in method " + element.Name + ":" + param.Name + ":" + param.Kind);
                                 }
-                                else
-                                    Message("Found a non parameter in method " + element.Name + ":" + param.Name + ":" + param.Kind);
                             }
                             _CurParent.Functions.Add((CRenameFunction)cItem);
                             break;
@@ -317,8 +357,12 @@ namespace Variable_Renamer
                             cItem = new CRenameItemClass();
                             _CurParent.Interfaces.Add((CRenameItemClass)cItem);
                             oldParent = _CurParent;
-                            _CurParent = (CRenameItemClass)cItem;
-                            IterateCodeElements(((CodeInterface2)element).Members);
+                            if (!gettingInherited)
+                                _CurParent = (CRenameItemClass)cItem;
+                            IterateCodeElements(((CodeInterface2)element).Members, gettingInherited);
+                            if (!gettingInherited)
+                                _CurParent = ((CRenameItemClass)cItem).InheritedStuff;
+                            IterateCodeElements(((CodeInterface2)element).Bases, true);
                             _CurParent = oldParent;
                             break;
                         case vsCMElement.vsCMElementEnum:
@@ -331,14 +375,18 @@ namespace Variable_Renamer
                             break;
                         case vsCMElement.vsCMElementNamespace:
                             CodeNamespace objCodeNamespace = objCodeElement as CodeNamespace;
-                            IterateCodeElements(objCodeNamespace.Members);
+                            IterateCodeElements(objCodeNamespace.Members, gettingInherited);
                             break;
                         case vsCMElement.vsCMElementClass:
                             cItem = new CRenameItemClass();
                             _CurParent.Classes.Add((CRenameItemClass)cItem);
                             oldParent = _CurParent;
-                            _CurParent = (CRenameItemClass)cItem;
-                            IterateCodeElements(((CodeClass2)element).Members);
+                            if (!gettingInherited)
+                                _CurParent = (CRenameItemClass)cItem;
+                            IterateCodeElements(((CodeClass2)element).Members, gettingInherited);
+                            if (!gettingInherited)
+                                _CurParent = ((CRenameItemClass)cItem).InheritedStuff;
+                            IterateCodeElements(((CodeClass2)element).Bases, true);
                             _CurParent = oldParent;
                             break;
                     }
@@ -348,7 +396,8 @@ namespace Variable_Renamer
                         {
                             cItem.Element = element;
                             cItem.Name = element.Name;
-                            cItem.Parent = _CurParent;
+                            if (!gettingInherited)
+                                cItem.Parent = (CRenameItemClass)_CurParent;
                         }
                         catch {}
                     }
@@ -476,29 +525,29 @@ namespace Variable_Renamer
 
         private void SetNewNames(CRenameItemClass renameItem)
         {
-            foreach (var item in renameItem.Classes)
+            foreach (CRenameItemClass item in renameItem.Classes)
             {
                 SetNewName(item, _RuleSet.Class);
                 SetNewNames(item);
             }
-            foreach (var item in renameItem.Interfaces)
+            foreach (CRenameItemClass item in renameItem.Interfaces)
             {
                 SetNewName(item, _RuleSet.Interface);
                 SetNewNames(item);
             }
-            foreach (var item in renameItem.Enums)
+            foreach (CRenameItemSub item in renameItem.Enums)
                 SetNewName(item, _RuleSet.Enum);
-            foreach (var item in renameItem.Structs)
+            foreach (CRenameItemSub item in renameItem.Structs)
                 SetNewName(item, _RuleSet.Struct);
 
-            foreach (var item in renameItem.Properties)
+            foreach (CRenameItem item in renameItem.Properties)
                 item.NewName = GetNewName((CodeProperty2)item.Element);
-            foreach (var item in renameItem.Variables)
+            foreach (CRenameItem item in renameItem.Variables)
                 item.NewName = GetNewName((CodeVariable2)item.Element);
-            foreach (var item in renameItem.Functions)
+            foreach (CRenameFunction item in renameItem.Functions)
             {
                 item.NewName = GetNewName((CodeFunction2)item.Element);
-                foreach (var param in item.Parameters)
+                foreach (CRenameItem param in item.Parameters)
                     SetNewName(param, _RuleSet.Parameter);
             }
         }
@@ -514,7 +563,7 @@ namespace Variable_Renamer
 
         private void ApplyChanges()
         {
-            foreach (var item in _RenameItems.Classes)
+            foreach (CRenameItemClass item in _RenameItems.Classes)
                 RenameSymbol(item);
         }
 
@@ -525,6 +574,8 @@ namespace Variable_Renamer
 
         private bool CheckChanges(CRenameItem item)
         {
+            if (item.Name == item.NewName)
+                return true;
             bool result;
             if (item is CRenameItemClass || item is CRenameItemSub)
                 result = !item.Parent.IdExists(item.NewName, item.Name);
@@ -547,13 +598,13 @@ namespace Variable_Renamer
 
         private bool TraverseItems(CRenameItemClass itemClass, HandleItem callBack)
         {
-            foreach (var item in itemClass.Classes)
+            foreach (CRenameItemClass item in itemClass.Classes)
             {
                 if (!callBack(item))
                     return false;
                 TraverseItems(item, callBack);
             }
-            foreach (var item in itemClass.Interfaces)
+            foreach (CRenameItemClass item in itemClass.Interfaces)
             {
                 if (!callBack(item))
                     return false;
@@ -567,7 +618,7 @@ namespace Variable_Renamer
                 return false;
             if (itemClass.Properties.Any(item => !callBack(item)))
                 return false;
-            foreach (var item in itemClass.Functions)
+            foreach (CRenameFunction item in itemClass.Functions)
             {
                 if (item.Parameters.Any(param => !callBack(param)))
                     return false;
@@ -588,14 +639,14 @@ namespace Variable_Renamer
                 return true;
             if (cItemClass.Structs.Any(c => c.Name == type))
                 return true;
-            foreach (var c in cItemClass.Interfaces)
+            foreach (CRenameItemClass c in cItemClass.Interfaces)
             {
                 if (c.Name == type)
                     return true;
                 if (TypeExistsInClass(type, c))
                     return true;
             }
-            foreach (var c in cItemClass.Classes)
+            foreach (CRenameItemClass c in cItemClass.Classes)
             {
                 if (c.Name == type)
                     return true;
