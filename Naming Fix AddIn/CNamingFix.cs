@@ -1,20 +1,20 @@
 ﻿#region license
-/*
-    This file is part of the item renamer Add-In for VS ("Add-In").
-
-    The Add-In is free software: you can redistribute it and/or modify
-    it under the terms of the GNU General Public License as published by
-    the Free Software Foundation, either version 3 of the License, or
-    (at your option) any later version.
-
-    The Add-In is distributed in the hope that it will be useful,
-    but WITHOUT ANY WARRANTY; without even the implied warranty of
-    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-    GNU General Public License for more details.
-
-    You should have received a copy of the GNU General Public License
-    along with Foobar.  If not, see <http://www.gnu.org/licenses/>.
- */
+// /*
+//     This file is part of Naming Fix AddIn.
+// 
+//     Naming Fix AddIn is free software: you can redistribute it and/or modify
+//     it under the terms of the GNU General Public License as published by
+//     the Free Software Foundation, either version 3 of the License, or
+//     (at your option) any later version.
+// 
+//     Naming Fix AddIn is distributed in the hope that it will be useful,
+//     but WITHOUT ANY WARRANTY; without even the implied warranty of
+//     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+//     GNU General Public License for more details.
+// 
+//     You should have received a copy of the GNU General Public License
+//     along with Naming Fix AddIn. If not, see <http://www.gnu.org/licenses/>.
+//  */
 #endregion
 
 using System;
@@ -24,9 +24,9 @@ using System.Text.RegularExpressions;
 using EnvDTE;
 using EnvDTE80;
 
-namespace Variable_Renamer
+namespace NamingFix
 {
-    class CItemRenamer
+    class CNamingFix
     {
         private const int Priv = 0;
         private const int Prot = 1;
@@ -48,7 +48,7 @@ namespace Variable_Renamer
         private readonly CTypeResolver _TypeResolver = new CTypeResolver();
         //Strings
         //comments
-        public CItemRenamer(DTE2 dte)
+        public CNamingFix(DTE2 dte)
         {
             _Dte = dte;
             Window window = _Dte.Windows.Item(Constants.vsWindowKindOutput);
@@ -159,7 +159,7 @@ namespace Variable_Renamer
                             {
                                 if (param.Kind == vsCMElement.vsCMElementParameter)
                                 {
-                                    CRenameItemVariable cItem2 = new CRenameItemVariable {Name = param.Name, Element = param, Parent = (CRenameItemClass)curParent};
+                                    CRenameItemVariable cItem2 = new CRenameItemVariable {Name = param.Name, Element = param, Parent = curParent};
                                     ((CRenameFunction)cItem).Parameters.Add(cItem2);
                                 }
                                 else
@@ -198,7 +198,7 @@ namespace Variable_Renamer
                         {
                             cItem.Element = element;
                             cItem.Name = element.Name;
-                            cItem.Parent = (CRenameItemClass)curParent;
+                            cItem.Parent = curParent;
                         }
                         catch {}
                     }
@@ -331,30 +331,30 @@ namespace Variable_Renamer
             CRenameItemClass itemClass = renameItem as CRenameItemClass;
             if (itemClass != null)
             {
-                foreach (var item in itemClass.Classes)
+                foreach (CRenameItemClass item in itemClass.Classes)
                 {
                     SetNewName(item, _RuleSet.Class);
                     SetNewNames(item);
                 }
-                foreach (var item in itemClass.Interfaces)
+                foreach (CRenameItemInterface item in itemClass.Interfaces)
                 {
                     SetNewName(item, _RuleSet.Interface);
                     SetNewNames(item);
                 }
-                foreach (var item in itemClass.Enums)
+                foreach (CRenameItemEnum item in itemClass.Enums)
                     SetNewName(item, _RuleSet.Enum);
-                foreach (var item in itemClass.Structs)
+                foreach (CRenameItemStruct item in itemClass.Structs)
                     SetNewName(item, _RuleSet.Struct);
-                foreach (var item in itemClass.Variables)
+                foreach (CRenameItemVariable item in itemClass.Variables)
                     item.NewName = GetNewName((CodeVariable2)item.Element);
             }
 
-            foreach (var item in renameItem.Properties)
+            foreach (CRenameItemVariable item in renameItem.Properties)
                 item.NewName = GetNewName((CodeProperty2)item.Element);
             foreach (CRenameFunction item in renameItem.Functions)
             {
                 item.NewName = GetNewName((CodeFunction2)item.Element);
-                foreach (var param in item.Parameters)
+                foreach (CRenameItemVariable param in item.Parameters)
                     SetNewName(param, _RuleSet.Parameter);
             }
         }

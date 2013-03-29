@@ -1,20 +1,20 @@
 ﻿#region license
-/*
-    This file is part of the item renamer Add-In for VS ("Add-In").
-
-    The Add-In is free software: you can redistribute it and/or modify
-    it under the terms of the GNU General Public License as published by
-    the Free Software Foundation, either version 3 of the License, or
-    (at your option) any later version.
-
-    The Add-In is distributed in the hope that it will be useful,
-    but WITHOUT ANY WARRANTY; without even the implied warranty of
-    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-    GNU General Public License for more details.
-
-    You should have received a copy of the GNU General Public License
-    along with Foobar.  If not, see <http://www.gnu.org/licenses/>.
- */
+// /*
+//     This file is part of Naming Fix AddIn.
+// 
+//     Naming Fix AddIn is free software: you can redistribute it and/or modify
+//     it under the terms of the GNU General Public License as published by
+//     the Free Software Foundation, either version 3 of the License, or
+//     (at your option) any later version.
+// 
+//     Naming Fix AddIn is distributed in the hope that it will be useful,
+//     but WITHOUT ANY WARRANTY; without even the implied warranty of
+//     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+//     GNU General Public License for more details.
+// 
+//     You should have received a copy of the GNU General Public License
+//     along with Naming Fix AddIn. If not, see <http://www.gnu.org/licenses/>.
+//  */
 #endregion
 
 using System;
@@ -22,10 +22,10 @@ using System.Collections.Generic;
 using System.Linq;
 using EnvDTE80;
 
-namespace Variable_Renamer
+namespace NamingFix
 {
     /// <summary>
-    /// Do not set Parent to anything!
+    ///     Do not set Parent to anything!
     /// </summary>
     class CRenameItemClassBase : CRenameItemInterfaceBase
     {
@@ -92,25 +92,25 @@ namespace Variable_Renamer
 
             CRenameItem result;
 
-            foreach (var item in Classes.Where(item => item.Name == topClass))
+            foreach (CRenameItemClass item in Classes.Where(item => item.Name == topClass))
             {
                 result = item.FindTypeNameDown(subClass);
                 if (result != null)
                     return result;
             }
-            foreach (var item in Interfaces.Where(item => item.Name == topClass))
+            foreach (CRenameItemInterface item in Interfaces.Where(item => item.Name == topClass))
             {
                 result = item.FindTypeName(subClass);
                 if (result != null)
                     return result;
             }
-            foreach (var item in Structs.Where(item => item.Name == topClass))
+            foreach (CRenameItemStruct item in Structs.Where(item => item.Name == topClass))
             {
                 result = item.FindTypeName(subClass);
                 if (result != null)
                     return result;
             }
-            foreach (var item in Enums.Where(item => item.Name == topClass))
+            foreach (CRenameItemEnum item in Enums.Where(item => item.Name == topClass))
             {
                 result = item.FindTypeName(subClass);
                 if (result != null)

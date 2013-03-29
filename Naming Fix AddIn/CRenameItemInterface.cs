@@ -1,20 +1,20 @@
 ﻿#region license
-/*
-    This file is part of the item renamer Add-In for VS ("Add-In").
-
-    The Add-In is free software: you can redistribute it and/or modify
-    it under the terms of the GNU General Public License as published by
-    the Free Software Foundation, either version 3 of the License, or
-    (at your option) any later version.
-
-    The Add-In is distributed in the hope that it will be useful,
-    but WITHOUT ANY WARRANTY; without even the implied warranty of
-    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-    GNU General Public License for more details.
-
-    You should have received a copy of the GNU General Public License
-    along with Foobar.  If not, see <http://www.gnu.org/licenses/>.
- */
+// /*
+//     This file is part of Naming Fix AddIn.
+// 
+//     Naming Fix AddIn is free software: you can redistribute it and/or modify
+//     it under the terms of the GNU General Public License as published by
+//     the Free Software Foundation, either version 3 of the License, or
+//     (at your option) any later version.
+// 
+//     Naming Fix AddIn is distributed in the hope that it will be useful,
+//     but WITHOUT ANY WARRANTY; without even the implied warranty of
+//     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+//     GNU General Public License for more details.
+// 
+//     You should have received a copy of the GNU General Public License
+//     along with Naming Fix AddIn. If not, see <http://www.gnu.org/licenses/>.
+//  */
 #endregion
 
 using System.Collections.Generic;
@@ -22,7 +22,7 @@ using System.Linq;
 using System;
 using EnvDTE80;
 
-namespace Variable_Renamer
+namespace NamingFix
 {
     interface IRenameItemInterface
     {
@@ -35,7 +35,7 @@ namespace Variable_Renamer
         void AddEnum(CRenameItem type);
 
         /// <summary>
-        /// Checks if given Id collides with Member (Var/Property/Function) of this class and therfore is a invalid name
+        ///     Checks if given Id collides with Member (Var/Property/Function) of this class and therfore is a invalid name
         /// </summary>
         /// <param name="newName"></param>
         /// <param name="oldName"></param>
@@ -43,7 +43,7 @@ namespace Variable_Renamer
         bool IdCollidesWithMember(string newName, string oldName);
 
         /// <summary>
-        /// Checks if given Id collides with any other Id (Var/Property/Function) of this class and therefore is a invalide type name
+        ///     Checks if given Id collides with any other Id (Var/Property/Function) of this class and therefore is a invalide type name
         /// </summary>
         /// <param name="newName"></param>
         /// <param name="oldName"></param>

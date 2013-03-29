@@ -1,20 +1,20 @@
 ﻿#region license
-/*
-    This file is part of the item renamer Add-In for VS ("Add-In").
-
-    The Add-In is free software: you can redistribute it and/or modify
-    it under the terms of the GNU General Public License as published by
-    the Free Software Foundation, either version 3 of the License, or
-    (at your option) any later version.
-
-    The Add-In is distributed in the hope that it will be useful,
-    but WITHOUT ANY WARRANTY; without even the implied warranty of
-    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-    GNU General Public License for more details.
-
-    You should have received a copy of the GNU General Public License
-    along with Foobar.  If not, see <http://www.gnu.org/licenses/>.
- */
+// /*
+//     This file is part of Naming Fix AddIn.
+// 
+//     Naming Fix AddIn is free software: you can redistribute it and/or modify
+//     it under the terms of the GNU General Public License as published by
+//     the Free Software Foundation, either version 3 of the License, or
+//     (at your option) any later version.
+// 
+//     Naming Fix AddIn is distributed in the hope that it will be useful,
+//     but WITHOUT ANY WARRANTY; without even the implied warranty of
+//     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+//     GNU General Public License for more details.
+// 
+//     You should have received a copy of the GNU General Public License
+//     along with Naming Fix AddIn. If not, see <http://www.gnu.org/licenses/>.
+//  */
 #endregion
 
 using System.Diagnostics;
@@ -25,7 +25,7 @@ using EnvDTE;
 using EnvDTE80;
 using Microsoft.VisualStudio.Shell;
 
-namespace Variable_Renamer
+namespace NamingFix
 {
     /// <summary>
     ///     This is the class that implements the package exposed by this assembly.
@@ -72,7 +72,7 @@ namespace Variable_Renamer
 
             DTE2 Dte = GetGlobalService(typeof(DTE)) as DTE2;
 
-            CItemRenamer itemRenamer = new CItemRenamer(Dte);
+            CNamingFix itemRenamer = new CNamingFix(Dte);
 
             // Add our command handlers for menu (commands must exist in the .vsct file)
             OleMenuCommandService mcs = GetService(typeof(IMenuCommandService)) as OleMenuCommandService;
