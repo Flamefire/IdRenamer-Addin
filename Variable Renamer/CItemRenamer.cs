@@ -26,184 +26,6 @@ using EnvDTE80;
 
 namespace Variable_Renamer
 {
-    enum ENamingStyle
-    {
-        UpperCamelCase,
-        LowerCamelCase,
-        UpperCase,
-        LowerCase
-    }
-
-    struct SRenameRule
-    {
-        public bool DontChange;
-        public String RemovePrefix;
-        public String Prefix;
-        public ENamingStyle NamingStyle;
-    }
-
-    class CRenameItem
-    {
-        public string Name, NewName;
-        public CodeElement2 Element;
-        public CRenameItemClass Parent;
-    }
-
-    class CRenameItemSub : CRenameItem {}
-
-    class CRenameFunction : CRenameItem
-    {
-        public readonly List<CRenameItem> Parameters = new List<CRenameItem>();
-        public string Text = null;
-        private EditPoint _StartPt;
-        private TextPoint _EndPt;
-        private readonly List<string> _Strings = new List<string>();
-        private readonly List<string> _Comments = new List<string>();
-        private static readonly Regex _ReString = new Regex(@"""(\\.|[^\\""])*""", RegexOptions.Compiled | RegexOptions.Singleline);
-        private static readonly Regex _ReVarbatimString = new Regex("@\"(\"\"|[^\"])*\"", RegexOptions.Compiled | RegexOptions.Multiline);
-        private static readonly Regex _ReCommentSl = new Regex(@"//[^\r\n]*\r\n", RegexOptions.Compiled | RegexOptions.Singleline);
-        private static readonly Regex _ReCommentMl = new Regex(@"/\*.*?\*/", RegexOptions.Compiled | RegexOptions.Multiline);
-
-        public String GetText()
-        {
-            CodeFunction2 func = (CodeFunction2)Element;
-            _StartPt = func.GetStartPoint(vsCMPart.vsCMPartBody).CreateEditPoint();
-            _EndPt = func.GetEndPoint(vsCMPart.vsCMPartBody);
-            return _StartPt.GetText(_EndPt);
-        }
-
-        public void SetText(String text)
-        {
-            _StartPt.ReplaceText(_EndPt, text, (int)vsEPReplaceTextOptions.vsEPReplaceTextKeepMarkers);
-        }
-
-        public void RemoveTextComments(ref String text)
-        {
-            _Strings.Clear();
-            _Comments.Clear();
-            text = _ReString.Replace(text, delegate(Match m)
-                {
-                    _Strings.Add(m.Value);
-                    return "\"ReplacedStr:::" + (_Strings.Count - 1) + ":::\"";
-                });
-            text = _ReVarbatimString.Replace(text, delegate(Match m)
-                {
-                    _Strings.Add(m.Value);
-                    return "\"ReplacedStr:::" + (_Strings.Count - 1) + ":::\"";
-                });
-            text = _ReCommentSl.Replace(text, delegate(Match m)
-                {
-                    _Comments.Add(m.Value);
-                    return "//ReplacedCom:::" + (_Comments.Count - 1) + ":::;\r\n";
-                });
-            text = _ReCommentMl.Replace(text, delegate(Match m)
-                {
-                    _Comments.Add(m.Value);
-                    return "//ReplacedCom:::" + (_Comments.Count - 1) + ":::;\r\n";
-                });
-        }
-
-        public void RestoreTextComments(ref String text)
-        {
-            for (int i = 0; i < _Strings.Count; i++)
-                text = text.Replace("\"ReplacedStr:::" + i + ":::\"", _Strings[i]);
-            for (int i = 0; i < _Comments.Count; i++)
-                text = text.Replace("//ReplacedCom:::" + i + ":::;\r\n", _Comments[i]);
-        }
-    }
-
-    class CRenameItemClassBase : CRenameItem
-    {
-        public readonly List<CRenameFunction> Functions = new List<CRenameFunction>();
-        public readonly List<CRenameItem> Variables = new List<CRenameItem>();
-        public readonly List<CRenameItem> Properties = new List<CRenameItem>();
-        public readonly List<CRenameItemClass> Classes = new List<CRenameItemClass>();
-        public readonly List<CRenameItemClass> Interfaces = new List<CRenameItemClass>();
-        public readonly List<CRenameItemSub> Structs = new List<CRenameItemSub>();
-        public readonly List<CRenameItemSub> Enums = new List<CRenameItemSub>();
-
-        public bool MemberExistsInt(string newName, string oldName = "")
-        {
-            return Functions.Any(item => item.NewName == newName && item.Name != oldName) ||
-                   Variables.Any(item => item.NewName == newName && item.Name != oldName) ||
-                   Properties.Any(item => item.NewName == newName && item.Name != oldName);
-        }
-
-        public bool IdExistsInt(string newName, string oldName = "")
-        {
-            return MemberExistsInt(newName, oldName) || IdExistsInt2(newName, oldName);
-        }
-
-        private bool IdExistsInt2(string newName, string oldName = "")
-        {
-            return Classes.Any(item => item.NewName == newName && item.Name != oldName) ||
-                   Interfaces.Any(item => item.NewName == newName && item.Name != oldName) ||
-                   Structs.Any(item => item.NewName == newName && item.Name != oldName) ||
-                   Enums.Any(item => item.NewName == newName && item.Name != oldName) ||
-                   (Parent != null && Parent.IdExistsInt2(newName, oldName));
-        }
-    }
-
-    class CRenameItemClass : CRenameItemClassBase
-    {
-        public readonly CRenameItemClassBase InheritedStuff;
-
-        public CRenameItemClass()
-        {
-            InheritedStuff = new CRenameItemClassBase {Parent = this};
-        }
-
-        public bool MemberExists(string newName, string oldName = "")
-        {
-            return MemberExistsInt(newName, oldName) || InheritedStuff.MemberExistsInt(newName, oldName);
-        }
-
-        public bool IdExists(string newName, string oldName = "")
-        {
-            return InheritedStuff.IdExistsInt(newName, oldName);
-        }
-    }
-
-    class CRenameRuleSet
-    {
-        public const int Priv = 0;
-        public const int Prot = 1;
-        public const int Pub = 2;
-
-        public SRenameRule
-            Parameter,
-            LokalVariable,
-            LokalConst,
-            Interface,
-            Class,
-            Enum,
-            Struct;
-        public SRenameRule[]
-            Const,
-            Field,
-            Property,
-            Method;
-
-        public CRenameRuleSet()
-        {
-            Const = new SRenameRule[3];
-            Field = new SRenameRule[3];
-            Property = new SRenameRule[3];
-            Method = new SRenameRule[3];
-            Parameter.NamingStyle = ENamingStyle.LowerCamelCase;
-            LokalVariable.NamingStyle = ENamingStyle.LowerCamelCase;
-            LokalConst.NamingStyle = ENamingStyle.LowerCamelCase;
-            Const[Priv].Prefix = "_";
-            Field[Priv].Prefix = "_";
-            Method[Priv].Prefix = "_";
-            Property[Priv].Prefix = "_";
-            Interface.Prefix = "I";
-            Class.Prefix = "C";
-            Enum.Prefix = "E";
-            Struct.Prefix = "S";
-        }
-    }
-
     class CItemRenamer
     {
         private const int Priv = 0;
@@ -220,7 +42,6 @@ namespace Variable_Renamer
         private static readonly Regex _ReEndsWithNoCaps = new Regex("[a-z]$", RegexOptions.Compiled);
 
         private CRenameItemClass _RenameItems;
-        private CRenameItemClassBase _CurParent;
 
         private readonly List<String> _FoundTypes = new List<string>();
 
@@ -288,7 +109,6 @@ namespace Variable_Renamer
         private void BuildClassTree()
         {
             _RenameItems = new CRenameItemClass();
-            _CurParent = _RenameItems;
             foreach (Project project in _Dte.Solution.Projects)
                 IterateProjectItems(project.ProjectItems);
         }
@@ -300,7 +120,7 @@ namespace Variable_Renamer
                 if (item.Kind == Constants.vsProjectItemKindPhysicalFile && item.Name.EndsWith(".cs"))
                 {
                     Message("File " + item.Name + ":");
-                    IterateCodeElements(item.FileCodeModel.CodeElements, false);
+                    IterateCodeElements(item.FileCodeModel.CodeElements, _RenameItems);
                 }
                 if (item.SubProject != null)
                     IterateProjectItems(item.SubProject.ProjectItems);
@@ -310,7 +130,7 @@ namespace Variable_Renamer
         }
 
         //Iterate through all the code elements in the provided element
-        private void IterateCodeElements(CodeElements colCodeElements, bool gettingInherited)
+        private void IterateCodeElements(CodeElements colCodeElements, IRenameItemInterface curParent)
         {
             //Check for nonmutable object inheritance
             if (colCodeElements == null)
@@ -321,73 +141,55 @@ namespace Variable_Renamer
                 {
                     CodeElement2 element = objCodeElement as CodeElement2;
                     CRenameItem cItem = null;
-                    CRenameItemClassBase oldParent;
                     switch (element.Kind)
                     {
                         case vsCMElement.vsCMElementVariable:
-                            cItem = new CRenameItem();
-                            _CurParent.Variables.Add(cItem);
+                            cItem = new CRenameItemVariable();
+                            curParent.AddVar(cItem);
                             break;
                         case vsCMElement.vsCMElementProperty:
-                            cItem = new CRenameItem();
-                            _CurParent.Properties.Add(cItem);
+                            cItem = new CRenameItemVariable();
+                            curParent.AddProperty(cItem);
                             break;
                         case vsCMElement.vsCMElementFunction:
                             cItem = new CRenameFunction();
                             CodeFunction2 func = (CodeFunction2)element;
 
-                            if (!gettingInherited)
+                            foreach (CodeElement2 param in func.Children)
                             {
-                                foreach (CodeElement2 param in func.Children)
+                                if (param.Kind == vsCMElement.vsCMElementParameter)
                                 {
-                                    if (param.Kind == vsCMElement.vsCMElementParameter)
-                                    {
-                                        CRenameItem cItem2 = new CRenameItem {Name = param.Name, Element = param, Parent = (CRenameItemClass)_CurParent};
-                                        ((CRenameFunction)cItem).Parameters.Add(cItem2);
-                                    }
-                                    else
-                                        Message("Found a non parameter in method " + element.Name + ":" + param.Name + ":" + param.Kind);
+                                    CRenameItemVariable cItem2 = new CRenameItemVariable {Name = param.Name, Element = param, Parent = (CRenameItemClass)curParent};
+                                    ((CRenameFunction)cItem).Parameters.Add(cItem2);
                                 }
+                                else
+                                    Message("Found a non parameter in method " + element.Name + ":" + param.Name + ":" + param.Kind);
                             }
-                            _CurParent.Functions.Add((CRenameFunction)cItem);
+                            curParent.AddFunc(cItem);
                             break;
                         case vsCMElement.vsCMElementParameter:
                             throw new Exception("Found a parameter but did not expect one!");
                         case vsCMElement.vsCMElementInterface:
-                            cItem = new CRenameItemClass();
-                            _CurParent.Interfaces.Add((CRenameItemClass)cItem);
-                            oldParent = _CurParent;
-                            if (!gettingInherited)
-                                _CurParent = (CRenameItemClass)cItem;
-                            IterateCodeElements(((CodeInterface2)element).Members, gettingInherited);
-                            if (!gettingInherited)
-                                _CurParent = ((CRenameItemClass)cItem).InheritedStuff;
-                            IterateCodeElements(((CodeInterface2)element).Bases, true);
-                            _CurParent = oldParent;
+                            cItem = new CRenameItemInterface();
+                            curParent.AddInterface(cItem);
+                            IterateCodeElements(((CodeInterface2)element).Members, (CRenameItemInterface)cItem);
                             break;
                         case vsCMElement.vsCMElementEnum:
-                            cItem = new CRenameItemSub();
-                            _CurParent.Enums.Add((CRenameItemSub)cItem);
+                            cItem = new CRenameItemEnum();
+                            curParent.AddEnum(cItem);
                             break;
                         case vsCMElement.vsCMElementStruct:
-                            cItem = new CRenameItemSub();
-                            _CurParent.Structs.Add((CRenameItemSub)cItem);
+                            cItem = new CRenameItemStruct();
+                            curParent.AddStruct(cItem);
                             break;
                         case vsCMElement.vsCMElementNamespace:
                             CodeNamespace objCodeNamespace = objCodeElement as CodeNamespace;
-                            IterateCodeElements(objCodeNamespace.Members, gettingInherited);
+                            IterateCodeElements(objCodeNamespace.Members, curParent);
                             break;
                         case vsCMElement.vsCMElementClass:
                             cItem = new CRenameItemClass();
-                            _CurParent.Classes.Add((CRenameItemClass)cItem);
-                            oldParent = _CurParent;
-                            if (!gettingInherited)
-                                _CurParent = (CRenameItemClass)cItem;
-                            IterateCodeElements(((CodeClass2)element).Members, gettingInherited);
-                            if (!gettingInherited)
-                                _CurParent = ((CRenameItemClass)cItem).InheritedStuff;
-                            IterateCodeElements(((CodeClass2)element).Bases, true);
-                            _CurParent = oldParent;
+                            curParent.AddClass(cItem);
+                            IterateCodeElements(((CodeClass2)element).Members, (CRenameItemClass)cItem);
                             break;
                     }
                     if (cItem != null)
@@ -396,8 +198,7 @@ namespace Variable_Renamer
                         {
                             cItem.Element = element;
                             cItem.Name = element.Name;
-                            if (!gettingInherited)
-                                cItem.Parent = (CRenameItemClass)_CurParent;
+                            cItem.Parent = (CRenameItemClass)curParent;
                         }
                         catch {}
                     }
@@ -405,6 +206,8 @@ namespace Variable_Renamer
                 catch {}
             }
         }
+
+        private void GetInherited(CRenameItemClass child) {}
         #endregion
 
         #region GetNewName
@@ -523,37 +326,39 @@ namespace Variable_Renamer
             item.NewName = GetNewName(item.Name, rule);
         }
 
-        private void SetNewNames(CRenameItemClass renameItem)
+        private void SetNewNames(CRenameItemInterfaceBase renameItem)
         {
-            foreach (CRenameItemClass item in renameItem.Classes)
+            CRenameItemClass itemClass = renameItem as CRenameItemClass;
+            if (itemClass != null)
             {
-                SetNewName(item, _RuleSet.Class);
-                SetNewNames(item);
+                foreach (var item in itemClass.Classes)
+                {
+                    SetNewName(item, _RuleSet.Class);
+                    SetNewNames(item);
+                }
+                foreach (var item in itemClass.Interfaces)
+                {
+                    SetNewName(item, _RuleSet.Interface);
+                    SetNewNames(item);
+                }
+                foreach (var item in itemClass.Enums)
+                    SetNewName(item, _RuleSet.Enum);
+                foreach (var item in itemClass.Structs)
+                    SetNewName(item, _RuleSet.Struct);
+                foreach (var item in itemClass.Variables)
+                    item.NewName = GetNewName((CodeVariable2)item.Element);
             }
-            foreach (CRenameItemClass item in renameItem.Interfaces)
-            {
-                SetNewName(item, _RuleSet.Interface);
-                SetNewNames(item);
-            }
-            foreach (CRenameItemSub item in renameItem.Enums)
-                SetNewName(item, _RuleSet.Enum);
-            foreach (CRenameItemSub item in renameItem.Structs)
-                SetNewName(item, _RuleSet.Struct);
 
-            foreach (CRenameItem item in renameItem.Properties)
+            foreach (var item in renameItem.Properties)
                 item.NewName = GetNewName((CodeProperty2)item.Element);
-            foreach (CRenameItem item in renameItem.Variables)
-                item.NewName = GetNewName((CodeVariable2)item.Element);
             foreach (CRenameFunction item in renameItem.Functions)
             {
                 item.NewName = GetNewName((CodeFunction2)item.Element);
-                foreach (CRenameItem param in item.Parameters)
+                foreach (var param in item.Parameters)
                     SetNewName(param, _RuleSet.Parameter);
             }
         }
         #endregion
-
-        private delegate bool HandleItem(CRenameItem item);
 
         private void RenameSymbol(CRenameItem item)
         {
@@ -574,16 +379,19 @@ namespace Variable_Renamer
 
         private bool CheckChanges(CRenameItem item)
         {
+            //No renaming is ok
             if (item.Name == item.NewName)
                 return true;
             bool result;
-            if (item is CRenameItemClass || item is CRenameItemSub)
-                result = !item.Parent.IdExists(item.NewName, item.Name);
+            if (item is CRenameItemType)
+                //if item is a type then thre must not be another id with same name in that scope
+                result = !item.Parent.IdCollidesWithId(item.NewName, item.Name);
             else
-                result = !item.Parent.MemberExists(item.NewName, item.Name);
+                //if item is a variable, property or function then there must be no other v, p or f
+                result = !item.Parent.IdCollidesWithMember(item.NewName, item.Name);
             if (!result)
             {
-                Message("Cannot rename " + item.Name + " to " + item.NewName);
+                Message("Cannot rename " + item.Name + " to " + item.NewName + " as it would be the same name as another item");
                 if (item.Element.ProjectItem.Document.Windows.Count == 0)
                     item.Element.ProjectItem.Open();
                 item.Element.StartPoint.TryToShow(vsPaneShowHow.vsPaneShowTop);
@@ -591,34 +399,40 @@ namespace Variable_Renamer
             return true;
         }
 
+        private delegate bool HandleItem(CRenameItem item);
+
         private bool TraverseItems(HandleItem callBack)
         {
             return TraverseItems(_RenameItems, callBack);
         }
 
-        private bool TraverseItems(CRenameItemClass itemClass, HandleItem callBack)
+        private bool TraverseItems(CRenameItemInterfaceBase itemInterface, HandleItem callBack)
         {
-            foreach (CRenameItemClass item in itemClass.Classes)
+            CRenameItemClass itemClass = itemInterface as CRenameItemClass;
+            if (itemClass != null)
             {
-                if (!callBack(item))
+                foreach (CRenameItemClass item in itemClass.Classes)
+                {
+                    if (!callBack(item))
+                        return false;
+                    TraverseItems(item, callBack);
+                }
+                foreach (CRenameItemInterface item in itemClass.Interfaces)
+                {
+                    if (!callBack(item))
+                        return false;
+                    TraverseItems(item, callBack);
+                }
+                if (itemClass.Enums.Any(item => !callBack(item)))
                     return false;
-                TraverseItems(item, callBack);
-            }
-            foreach (CRenameItemClass item in itemClass.Interfaces)
-            {
-                if (!callBack(item))
+                if (itemClass.Structs.Any(item => !callBack(item)))
                     return false;
-                TraverseItems(item, callBack);
+                if (itemClass.Variables.Any(item => !callBack(item)))
+                    return false;
             }
-            if (itemClass.Enums.Any(item => !callBack(item)))
+            if (itemInterface.Properties.Any(item => !callBack(item)))
                 return false;
-            if (itemClass.Structs.Any(item => !callBack(item)))
-                return false;
-            if (itemClass.Variables.Any(item => !callBack(item)))
-                return false;
-            if (itemClass.Properties.Any(item => !callBack(item)))
-                return false;
-            foreach (CRenameFunction item in itemClass.Functions)
+            foreach (CRenameFunction item in itemInterface.Functions)
             {
                 if (item.Parameters.Any(param => !callBack(param)))
                     return false;
@@ -630,30 +444,7 @@ namespace Variable_Renamer
 
         private bool TypeExists(string type)
         {
-            return _TypeResolver.IsType(type) || TypeExistsInClass(type, _RenameItems);
-        }
-
-        private bool TypeExistsInClass(string type, CRenameItemClass cItemClass)
-        {
-            if (cItemClass.Enums.Any(c => c.Name == type))
-                return true;
-            if (cItemClass.Structs.Any(c => c.Name == type))
-                return true;
-            foreach (CRenameItemClass c in cItemClass.Interfaces)
-            {
-                if (c.Name == type)
-                    return true;
-                if (TypeExistsInClass(type, c))
-                    return true;
-            }
-            foreach (CRenameItemClass c in cItemClass.Classes)
-            {
-                if (c.Name == type)
-                    return true;
-                if (TypeExistsInClass(type, c))
-                    return true;
-            }
-            return false;
+            return _TypeResolver.IsType(type) || _RenameItems.FindTypeName(type) != null;
         }
 
         private void RenameMethod(CRenameFunction func)

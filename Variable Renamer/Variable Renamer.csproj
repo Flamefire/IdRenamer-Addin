@@ -118,6 +118,11 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="CItemRenamer.cs" />
+    <Compile Include="CRenameFunction.cs" />
+    <Compile Include="CRenameItem.cs" />
+    <Compile Include="CRenameItemClass.cs" />
+    <Compile Include="CRenameItemInterface.cs" />
+    <Compile Include="CRenameRuleSet.cs" />
     <Compile Include="Guids.cs" />
     <Compile Include="Resources.Designer.cs">
       <AutoGen>True</AutoGen>
