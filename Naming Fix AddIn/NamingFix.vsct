@@ -25,7 +25,7 @@
 
   <!--The Commands section is where we the commands, menus and menu groups are defined.
       This section uses a Guid to identify the package that provides the command defined inside it. -->
-  <Commands package="guidVariable_RenamerPkg">
+  <Commands package="guidNamingFixPkg">
     <!-- Inside this section we have different sub-sections: one for the menus, another  
     for the menu groups, one for the buttons (the actual commands), one for the combos 
     and the last one for the bitmaps used. Each element is identified by a command id that  
@@ -41,7 +41,7 @@
          must be a menu. -->
     <Groups>
 
-      <Group guid="guidVariable_RenamerCmdSet" id="MyMenuGroup" priority="0x0600">
+      <Group guid="guidNamingFixCmdSet" id="MyMenuGroup" priority="0x0600">
         <Parent guid="guidSHLMainMenu" id="IDM_VS_MENU_TOOLS"/>
       </Group>
       
@@ -61,8 +61,8 @@
               <CommandFlag>DynamicVisibility</CommandFlag>
           If you do not want an image next to your command, remove the Icon node /> -->
 
-      <Button guid="guidVariable_RenamerCmdSet" id="cmdApplyNameScheme" priority="0x0100" type="Button">
-        <Parent guid="guidVariable_RenamerCmdSet" id="MyMenuGroup" />
+      <Button guid="guidNamingFixCmdSet" id="cmdApplyNameScheme" priority="0x0100" type="Button">
+        <Parent guid="guidNamingFixCmdSet" id="MyMenuGroup" />
         <Icon guid="guidImages" id="bmpPic1" />
         <Strings>
           <ButtonText>Apply namescheme</ButtonText>
@@ -92,10 +92,10 @@
 
   <Symbols>
     <!-- This is the package guid. -->
-    <GuidSymbol name="guidVariable_RenamerPkg" value="{3d0ba8c5-842a-4c4c-9fb7-b2b562f18e7e}" />
+    <GuidSymbol name="guidNamingFixPkg" value="{3d0ba8c5-842a-4c4c-9fb7-b2b562f18e7e}" />
     
     <!-- This is the guid used to group the menu commands together -->
-    <GuidSymbol name="guidVariable_RenamerCmdSet" value="{508848dc-e39b-43ee-afc7-8500b661824a}">
+    <GuidSymbol name="guidNamingFixCmdSet" value="{508848dc-e39b-43ee-afc7-8500b661824a}">
 
       <IDSymbol name="MyMenuGroup" value="0x1020" />
       <IDSymbol name="cmdApplyNameScheme" value="0x0100" />

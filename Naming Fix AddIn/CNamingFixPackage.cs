@@ -39,11 +39,11 @@ namespace NamingFix
     // This attribute tells the PkgDef creation utility (CreatePkgDef.exe) that this class is
     // a package.
     [PackageRegistration(UseManagedResourcesOnly = true), InstalledProductRegistration("#110", "#112", "1.0", IconResourceID = 400), ProvideMenuResource("Menus.ctmenu", 1),
-     Guid(GuidList.guidVariable_RenamerPkgString)]
+     Guid(GuidList.GuidNamingFixPkgString)]
     // This attribute is used to register the information needed to show this package
     // in the Help/About dialog of Visual Studio.
     // This attribute is needed to let the shell know that this package exposes some menus.
-    public sealed class Variable_RenamerPackage : Package
+    public sealed class CNamingFixPackage : Package
     {
         /// <summary>
         ///     Default constructor of the package.
@@ -52,7 +52,7 @@ namespace NamingFix
         ///     not sited yet inside Visual Studio environment. The place to do all the other
         ///     initialization is the Initialize method.
         /// </summary>
-        public Variable_RenamerPackage()
+        public CNamingFixPackage()
         {
             Debug.WriteLine(string.Format(CultureInfo.CurrentCulture, "Entering constructor for: {0}", ToString()));
         }
@@ -72,15 +72,15 @@ namespace NamingFix
 
             DTE2 Dte = GetGlobalService(typeof(DTE)) as DTE2;
 
-            CNamingFix itemRenamer = new CNamingFix(Dte);
+            CNamingFix namingFix = new CNamingFix(Dte);
 
             // Add our command handlers for menu (commands must exist in the .vsct file)
             OleMenuCommandService mcs = GetService(typeof(IMenuCommandService)) as OleMenuCommandService;
             if (null != mcs)
             {
                 // Create the command for the menu item.
-                CommandID menuCommandID = new CommandID(GuidList.guidVariable_RenamerCmdSet, (int)PkgCmdIDList.cmdApplyNameScheme);
-                MenuCommand menuItem = new MenuCommand(itemRenamer.MenuItemCallback, menuCommandID);
+                CommandID menuCommandId = new CommandID(GuidList.GuidNamingFixCmdSet, (int)PkgCmdIDList.cmdApplyNameScheme);
+                MenuCommand menuItem = new MenuCommand(namingFix.MenuItemCallback, menuCommandId);
                 mcs.AddCommand(menuItem);
             }
         }

@@ -1,4 +1,4 @@
-IdRenamer-Addin
+Naming Fix-AddIn
 ===============
 
-Renaming of Identifiers in Visual Studio C# Projects
+Renaming of Identifiers to comply with defined naming conventions in Visual Studio C# Projects

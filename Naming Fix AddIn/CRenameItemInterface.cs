@@ -91,6 +91,23 @@ namespace NamingFix
             throw new NotImplementedException();
         }
 
+        public virtual void CopyIds(CRenameItemInterfaceBase otherItem, bool readOnly = false)
+        {
+            AddUniqueItems(Functions, otherItem.Functions, otherItem.ReadOnly || readOnly);
+            AddUniqueItems(Properties, otherItem.Properties, otherItem.ReadOnly || readOnly);
+        }
+
+        protected void AddUniqueItems<T>(List<T> list, List<T> listOther, bool readOnly) where T : CRenameItem
+        {
+            foreach (var itemOther in listOther)
+            {
+                if (list.Any(item => item.Name == itemOther.Name))
+                    continue;
+                itemOther.ReadOnly = itemOther.ReadOnly || readOnly;
+                list.Add(itemOther);
+            }
+        }
+
         public virtual bool IdCollidesWithMember(string newName, string oldName)
         {
             return Functions.Any(item => item.NewName == newName && item.Name != oldName) ||
@@ -106,9 +123,29 @@ namespace NamingFix
 
     class CRenameItemInterface : CRenameItemInterfaceBase
     {
+        public CRenameItemInterfaceBase InheritedStuff;
+
         public CodeInterface2 GetElement()
         {
             return GetElement<CodeInterface2>();
+        }
+
+        public override void CopyIds(CRenameItemInterfaceBase otherItem, bool readOnly = false)
+        {
+            InheritedStuff.CopyIds(otherItem, readOnly);
+            var otherItem2 = otherItem as CRenameItemInterface;
+            if (otherItem2 != null)
+                InheritedStuff.CopyIds(otherItem2.InheritedStuff, otherItem2.ReadOnly || readOnly);
+        }
+
+        public override bool IdCollidesWithMember(string newName, string oldName)
+        {
+            return base.IdCollidesWithMember(newName, oldName) || (InheritedStuff != null && InheritedStuff.IdCollidesWithMember(newName, oldName));
+        }
+
+        public override bool IdCollidesWithId(string newName, string oldName)
+        {
+            return base.IdCollidesWithId(newName, oldName) || (InheritedStuff != null && InheritedStuff.IdCollidesWithId(newName, oldName));
         }
     }
 }

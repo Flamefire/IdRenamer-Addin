@@ -60,6 +60,19 @@ namespace NamingFix
             Structs.Add((CRenameItemStruct)type);
         }
 
+        public override void CopyIds(CRenameItemInterfaceBase otherItem, bool readOnly = false)
+        {
+            base.CopyIds(otherItem, readOnly);
+            var otherItem2 = otherItem as CRenameItemClassBase;
+            if (otherItem2 == null)
+                return;
+            AddUniqueItems(Variables, otherItem2.Variables, otherItem2.ReadOnly || readOnly);
+            AddUniqueItems(Classes, otherItem2.Classes, otherItem2.ReadOnly || readOnly);
+            AddUniqueItems(Interfaces, otherItem2.Interfaces, otherItem2.ReadOnly || readOnly);
+            AddUniqueItems(Enums, otherItem2.Enums, otherItem2.ReadOnly || readOnly);
+            AddUniqueItems(Structs, otherItem2.Structs, otherItem2.ReadOnly || readOnly);
+        }
+
         public override bool IdCollidesWithMember(string newName, string oldName)
         {
             return base.IdCollidesWithMember(newName, oldName) ||
@@ -84,75 +97,81 @@ namespace NamingFix
 
         private CRenameItem FindTypeNameDown(String typeName)
         {
-            if (typeName == Name)
-                return this;
+            string mainType, subType;
+            SplitTypeName(typeName, out mainType, out subType);
 
-            string topClass, subClass;
-            SplitTypeName(typeName, out topClass, out subClass);
+            CRenameItemClass cClass = Classes.FirstOrDefault(item => item.Name == mainType);
+            if (subType != "")
+            {
+                //Only classes can have subTypes so either get down in this class or exit
+                return cClass != null ? cClass.FindTypeNameDown(subType) : null;
+            }
+            if (cClass != null)
+                return cClass;
 
-            CRenameItem result;
+            CRenameItem result = Interfaces.FirstOrDefault(item => item.Name == mainType);
+            if (result != null)
+                return result;
+            result = Structs.FirstOrDefault(item => item.Name == mainType);
+            if (result != null)
+                return result;
+            result = Enums.FirstOrDefault(item => item.Name == mainType);
 
-            foreach (CRenameItemClass item in Classes.Where(item => item.Name == topClass))
-            {
-                result = item.FindTypeNameDown(subClass);
-                if (result != null)
-                    return result;
-            }
-            foreach (CRenameItemInterface item in Interfaces.Where(item => item.Name == topClass))
-            {
-                result = item.FindTypeName(subClass);
-                if (result != null)
-                    return result;
-            }
-            foreach (CRenameItemStruct item in Structs.Where(item => item.Name == topClass))
-            {
-                result = item.FindTypeName(subClass);
-                if (result != null)
-                    return result;
-            }
-            foreach (CRenameItemEnum item in Enums.Where(item => item.Name == topClass))
-            {
-                result = item.FindTypeName(subClass);
-                if (result != null)
-                    return result;
-            }
-            return null;
+            return result;
         }
 
-        public override CRenameItem FindTypeName(string typeName)
+        public override CRenameItem FindTypeByName(string typeName)
         {
+            //Strip redundant own typename
+            //This is only valid where the id has been defined so do it here
+            string mainType, subType;
+            SplitTypeName(typeName, out mainType, out subType);
+            if (mainType == Name)
+            {
+                if (subType == "")
+                    return this;
+                typeName = subType;
+            }
             CRenameItem result = FindTypeNameDown(typeName);
             if (result != null)
                 return result;
-            return Parent != null ? ((CRenameItemClass)Parent).FindTypeName(typeName) : null;
+            return Parent != null ? ((CRenameItemClass)Parent).FindTypeByName(typeName) : null;
         }
     }
 
     class CRenameItemClass : CRenameItemClassBase
     {
-        public readonly CRenameItemClassBase InheritedStuff = new CRenameItemClassBase();
+        public CRenameItemClassBase InheritedStuff;
 
         public CodeClass2 GetElement()
         {
             return GetElement<CodeClass2>();
         }
 
+        public override void CopyIds(CRenameItemInterfaceBase otherItem, bool readOnly = false)
+        {
+            InheritedStuff.CopyIds(otherItem, readOnly);
+            var otherItem2 = otherItem as CRenameItemClass;
+            if (otherItem2 != null)
+                InheritedStuff.CopyIds(otherItem2.InheritedStuff, otherItem2.ReadOnly || readOnly);
+        }
+
         public override bool IdCollidesWithMember(string newName, string oldName)
         {
-            return base.IdCollidesWithMember(newName, oldName) || InheritedStuff.IdCollidesWithMember(newName, oldName);
+            return base.IdCollidesWithMember(newName, oldName) || (InheritedStuff != null && InheritedStuff.IdCollidesWithMember(newName, oldName));
         }
 
         public override bool IdCollidesWithId(string newName, string oldName)
         {
-            return base.IdCollidesWithId(newName, oldName) || InheritedStuff.IdCollidesWithId(newName, oldName);
+            return base.IdCollidesWithId(newName, oldName) || (InheritedStuff != null && InheritedStuff.IdCollidesWithId(newName, oldName));
         }
 
-        public override CRenameItem FindTypeName(string typeName)
+        public override CRenameItem FindTypeByName(string typeName)
         {
-            CRenameItem result = base.FindTypeName(typeName);
+            CRenameItem result = base.FindTypeByName(typeName);
             if (result != null)
                 return result;
-            return InheritedStuff.FindTypeName(typeName);
+            return InheritedStuff != null ? InheritedStuff.FindTypeByName(typeName) : null;
         }
     }
 }

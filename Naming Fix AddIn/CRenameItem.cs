@@ -24,10 +24,20 @@ namespace NamingFix
 {
     class CRenameItem
     {
-        public string Name, NewName;
+        private string _Name;
+        public string Name
+        {
+            get { return _Name; }
+            set
+            {
+                _Name = value;
+                NewName = value;
+            }
+        }
+        public string NewName;
         public CodeElement2 Element;
         public IRenameItemInterface Parent;
-        public bool readOnly;
+        public virtual bool ReadOnly { get; set; }
 
         protected T GetElement<T>()
         {
@@ -45,7 +55,7 @@ namespace NamingFix
 
     class CRenameItemType : CRenameItem
     {
-        public virtual CRenameItem FindTypeName(string typeName)
+        public virtual CRenameItem FindTypeByName(string typeName)
         {
             return Name == typeName ? this : null;
         }

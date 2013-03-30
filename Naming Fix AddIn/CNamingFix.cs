@@ -21,6 +21,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text.RegularExpressions;
+using System.Windows.Forms;
 using EnvDTE;
 using EnvDTE80;
 
@@ -64,7 +65,14 @@ namespace NamingFix
         public void MenuItemCallback(object sender, EventArgs e)
         {
             _Dte.UndoContext.Open("Item renaming");
-            Execute();
+            try
+            {
+                Execute();
+            }
+            catch (Exception exception)
+            {
+                MessageBox.Show("Exception occured!:\r\n" + exception.Message, "Exception occured", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
             _Dte.UndoContext.Close();
         }
 
@@ -111,6 +119,7 @@ namespace NamingFix
             _RenameItems = new CRenameItemClass();
             foreach (Project project in _Dte.Solution.Projects)
                 IterateProjectItems(project.ProjectItems);
+            AddInheritedInfoToMembers(_RenameItems);
         }
 
         private void IterateProjectItems(ProjectItems projectItems)
@@ -155,7 +164,7 @@ namespace NamingFix
                             cItem = new CRenameFunction();
                             CodeFunction2 func = (CodeFunction2)element;
 
-                            foreach (CodeElement2 param in func.Children)
+                            foreach (CodeElement2 param in func.Parameters)
                             {
                                 if (param.Kind == vsCMElement.vsCMElementParameter)
                                 {
@@ -207,7 +216,58 @@ namespace NamingFix
             }
         }
 
-        private void GetInherited(CRenameItemClass child) {}
+        private void AddInheritedInfoToMembers(CRenameItemClass child)
+        {
+            foreach (var item in child.Classes)
+                GetInherited(item);
+            foreach (var item in child.Interfaces)
+                GetInherited(item);
+        }
+
+        private void GetInherited(CRenameItemClass child)
+        {
+            if (child.InheritedStuff != null)
+                return;
+            child.InheritedStuff = new CRenameItemClassBase();
+            foreach (CodeElement2 baseClass in child.GetElement().Bases)
+                ProcessBaseElement<CRenameItemClass>(baseClass, child);
+            foreach (CodeElement2 implInterface in child.GetElement().ImplementedInterfaces)
+                ProcessBaseElement<CRenameItemInterface>(implInterface, child);
+            AddInheritedInfoToMembers(child);
+        }
+
+        private void GetInherited(CRenameItemInterface child)
+        {
+            if (child.InheritedStuff != null)
+                return;
+            child.InheritedStuff = new CRenameItemInterfaceBase();
+            foreach (CodeElement2 element in child.GetElement().Bases)
+                ProcessBaseElement<CRenameItemInterface>(element, child);
+        }
+
+        private void ProcessBaseElement<T>(CodeElement2 element, CRenameItemInterfaceBase child) where T : CRenameItemInterfaceBase, new()
+        {
+            //Look for (programmer-defined) project class
+            T baseType = (T)child.FindTypeByName(element.Name);
+            if (baseType == null)
+            {
+                //Class is system or extern class
+                baseType = new T {Element = element, Name = element.Name, ReadOnly = true};
+                if (element.Kind == vsCMElement.vsCMElementClass)
+                    IterateCodeElements(((CodeClass2)element).Members, baseType);
+                else
+                    IterateCodeElements(((CodeInterface2)element).Members, baseType);
+            }
+
+            //Make sure, inheritance info is filled
+            var tmpClass = baseType as CRenameItemClass;
+            if (tmpClass != null)
+                GetInherited(tmpClass);
+            else
+                GetInherited(baseType as CRenameItemInterface);
+            //Get all Ids from class and its parents
+            child.CopyIds(baseType);
+        }
         #endregion
 
         #region GetNewName
@@ -391,9 +451,9 @@ namespace NamingFix
                 result = !item.Parent.IdCollidesWithMember(item.NewName, item.Name);
             if (!result)
             {
-                Message("Cannot rename " + item.Name + " to " + item.NewName + " as it would be the same name as another item");
-                if (item.Element.ProjectItem.Document.Windows.Count == 0)
-                    item.Element.ProjectItem.Open();
+                Message("Cannot rename " + item.Name + " to " + item.NewName + " as another identifier already exists or is about to be renamed to the same name!");
+                if (item.Element.ProjectItem.Document == null || item.Element.ProjectItem.Document.Windows.Count == 0)
+                    item.Element.ProjectItem.Open(Constants.vsViewKindCode);
                 item.Element.StartPoint.TryToShow(vsPaneShowHow.vsPaneShowTop);
             }
             return true;
@@ -444,7 +504,7 @@ namespace NamingFix
 
         private bool TypeExists(string type)
         {
-            return _TypeResolver.IsType(type) || _RenameItems.FindTypeName(type) != null;
+            return _TypeResolver.IsType(type) || _RenameItems.FindTypeByName(type) != null;
         }
 
         private void RenameMethod(CRenameFunction func)
