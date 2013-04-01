@@ -45,13 +45,17 @@ namespace NamingFix
         }
     }
 
-    class CRenameItemVariable : CRenameItem
+    class CRenameItemProperty : CRenameItem
     {
         public CodeVariable2 GetElement()
         {
             return GetElement<CodeVariable2>();
         }
     }
+
+    class CRenameItemVariable : CRenameItemProperty {}
+
+    class CRenameItemParameter : CRenameItemVariable {}
 
     class CRenameItemType : CRenameItem
     {
@@ -74,6 +78,14 @@ namespace NamingFix
         public CodeStruct GetElement()
         {
             return GetElement<CodeStruct>();
+        }
+    }
+
+    class CRenameItemDelegate : CRenameItemType
+    {
+        public CodeDelegate2 GetElement()
+        {
+            return GetElement<CodeDelegate2>();
         }
     }
 }

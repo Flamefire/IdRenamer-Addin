@@ -29,35 +29,32 @@ namespace NamingFix
     /// </summary>
     class CRenameItemClassBase : CRenameItemInterfaceBase
     {
+        public bool IsTopClass;
         public readonly List<CRenameItemClass> Classes = new List<CRenameItemClass>();
         public readonly List<CRenameItemInterface> Interfaces = new List<CRenameItemInterface>();
         public readonly List<CRenameItemStruct> Structs = new List<CRenameItemStruct>();
         public readonly List<CRenameItemEnum> Enums = new List<CRenameItemEnum>();
+        public readonly List<CRenameItemDelegate> Delegates = new List<CRenameItemDelegate>();
         public readonly List<CRenameItemVariable> Variables = new List<CRenameItemVariable>();
 
-        public override void AddVar(CRenameItem var)
+        public override void Add(CRenameItem item)
         {
-            Variables.Add((CRenameItemVariable)var);
-        }
-
-        public override void AddClass(CRenameItem type)
-        {
-            Classes.Add((CRenameItemClass)type);
-        }
-
-        public override void AddInterface(CRenameItem type)
-        {
-            Interfaces.Add((CRenameItemInterface)type);
-        }
-
-        public override void AddEnum(CRenameItem type)
-        {
-            Enums.Add((CRenameItemEnum)type);
-        }
-
-        public override void AddStruct(CRenameItem type)
-        {
-            Structs.Add((CRenameItemStruct)type);
+            // ReSharper disable CanBeReplacedWithTryCastAndCheckForNull
+            if (item is CRenameItemClass)
+                Classes.Add((CRenameItemClass)item);
+            else if (item is CRenameItemInterface)
+                Interfaces.Add((CRenameItemInterface)item);
+            else if (item is CRenameItemEnum)
+                Enums.Add((CRenameItemEnum)item);
+            else if (item is CRenameItemStruct)
+                Structs.Add((CRenameItemStruct)item);
+            else if (item is CRenameItemDelegate)
+                Delegates.Add((CRenameItemDelegate)item);
+            else if (item is CRenameItemVariable)
+                Variables.Add((CRenameItemVariable)item);
+            else base.Add(item);
+            item.Parent = this;
+            // ReSharper restore CanBeReplacedWithTryCastAndCheckForNull
         }
 
         public override void CopyIds(CRenameItemInterfaceBase otherItem, bool readOnly = false)
@@ -71,6 +68,7 @@ namespace NamingFix
             AddUniqueItems(Interfaces, otherItem2.Interfaces, otherItem2.ReadOnly || readOnly);
             AddUniqueItems(Enums, otherItem2.Enums, otherItem2.ReadOnly || readOnly);
             AddUniqueItems(Structs, otherItem2.Structs, otherItem2.ReadOnly || readOnly);
+            AddUniqueItems(Delegates, otherItem2.Delegates, otherItem2.ReadOnly || readOnly);
         }
 
         public override bool IdCollidesWithMember(string newName, string oldName)
@@ -85,7 +83,8 @@ namespace NamingFix
                    Classes.Any(item => item.NewName == newName && item.Name != oldName) ||
                    Interfaces.Any(item => item.NewName == newName && item.Name != oldName) ||
                    Structs.Any(item => item.NewName == newName && item.Name != oldName) ||
-                   Enums.Any(item => item.NewName == newName && item.Name != oldName);
+                    Enums.Any(item => item.NewName == newName && item.Name != oldName) ||
+                   Delegates.Any(item => item.NewName == newName && item.Name != oldName);
         }
 
         private static void SplitTypeName(string className, out string topClass, out String subClass)
@@ -116,6 +115,9 @@ namespace NamingFix
             if (result != null)
                 return result;
             result = Enums.FirstOrDefault(item => item.Name == mainType);
+            if (result != null)
+                return result;
+            result = Delegates.FirstOrDefault(item => item.Name == mainType);
 
             return result;
         }
@@ -135,7 +137,10 @@ namespace NamingFix
             CRenameItem result = FindTypeNameDown(typeName);
             if (result != null)
                 return result;
-            return Parent != null ? ((CRenameItemClass)Parent).FindTypeByName(typeName) : null;
+            if (Parent != null)
+                return ((CRenameItemClass)Parent).FindTypeByName(typeName);
+            //Assume we have a namespace and we are in top class
+            return (subType == "" || !IsTopClass) ? null : FindTypeByName(subType);
         }
     }
 

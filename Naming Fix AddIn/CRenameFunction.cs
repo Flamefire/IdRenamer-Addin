@@ -27,7 +27,7 @@ namespace NamingFix
 {
     class CRenameFunction : CRenameItem
     {
-        public readonly List<CRenameItemVariable> Parameters = new List<CRenameItemVariable>();
+        public readonly List<CRenameItemParameter> Parameters = new List<CRenameItemParameter>();
         private EditPoint _StartPt;
         private TextPoint _EndPt;
         private readonly List<string> _Strings = new List<string>();

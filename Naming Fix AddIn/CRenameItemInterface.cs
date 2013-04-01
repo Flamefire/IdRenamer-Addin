@@ -26,13 +26,7 @@ namespace NamingFix
 {
     interface IRenameItemInterface
     {
-        void AddFunc(CRenameItem func);
-        void AddVar(CRenameItem var);
-        void AddProperty(CRenameItem property);
-        void AddClass(CRenameItem type);
-        void AddInterface(CRenameItem type);
-        void AddStruct(CRenameItem type);
-        void AddEnum(CRenameItem type);
+        void Add(CRenameItem item);
 
         /// <summary>
         ///     Checks if given Id collides with Member (Var/Property/Function) of this class and therfore is a invalid name
@@ -54,41 +48,19 @@ namespace NamingFix
     class CRenameItemInterfaceBase : CRenameItemType, IRenameItemInterface
     {
         public readonly List<CRenameFunction> Functions = new List<CRenameFunction>();
-        public readonly List<CRenameItemVariable> Properties = new List<CRenameItemVariable>();
+        public readonly List<CRenameItemProperty> Properties = new List<CRenameItemProperty>();
 
-        public void AddFunc(CRenameItem func)
+        public virtual void Add(CRenameItem item)
         {
-            Functions.Add((CRenameFunction)func);
-        }
-
-        public void AddProperty(CRenameItem property)
-        {
-            Properties.Add((CRenameItemVariable)property);
-        }
-
-        public virtual void AddVar(CRenameItem var)
-        {
-            throw new NotImplementedException();
-        }
-
-        public virtual void AddClass(CRenameItem type)
-        {
-            throw new NotImplementedException();
-        }
-
-        public virtual void AddInterface(CRenameItem type)
-        {
-            throw new NotImplementedException();
-        }
-
-        public virtual void AddStruct(CRenameItem type)
-        {
-            throw new NotImplementedException();
-        }
-
-        public virtual void AddEnum(CRenameItem type)
-        {
-            throw new NotImplementedException();
+            // ReSharper disable CanBeReplacedWithTryCastAndCheckForNull
+            if (item is CRenameFunction)
+                Functions.Add((CRenameFunction)item);
+            else if (item is CRenameItemProperty)
+                Properties.Add((CRenameItemProperty)item);
+            else
+                throw new NotImplementedException();
+            item.Parent = this;
+            // ReSharper restore CanBeReplacedWithTryCastAndCheckForNull
         }
 
         public virtual void CopyIds(CRenameItemInterfaceBase otherItem, bool readOnly = false)
