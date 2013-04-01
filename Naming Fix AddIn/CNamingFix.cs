@@ -134,10 +134,7 @@ namespace NamingFix
                     Message("File " + item.Name + ":");
                     IterateCodeElements(item.FileCodeModel.CodeElements, _RenameItems);
                 }
-                if (item.SubProject != null)
-                    IterateProjectItems(item.SubProject.ProjectItems);
-                else
-                    IterateProjectItems(item.ProjectItems);
+                IterateProjectItems(item.SubProject != null ? item.SubProject.ProjectItems : item.ProjectItems);
             }
         }
 
@@ -188,7 +185,7 @@ namespace NamingFix
                             cItem = new CRenameItemStruct();
                             break;
                         case vsCMElement.vsCMElementNamespace:
-                            CodeNamespace objCodeNamespace = element as CodeNamespace;
+                            CodeNamespace objCodeNamespace = (CodeNamespace)element;
                             IterateCodeElements(objCodeNamespace.Members, curParent);
                             break;
                         case vsCMElement.vsCMElementClass:
@@ -230,7 +227,6 @@ namespace NamingFix
         {
             if (child.IsInheritedLoaded)
                 return;
-            child.InheritedStuff = new CRenameItemClassBase();
             foreach (CodeElement2 baseClass in child.GetElement().Bases)
                 ProcessBaseElement<CRenameItemClass>(baseClass, child);
             foreach (CodeElement2 implInterface in child.GetElement().ImplementedInterfaces)
@@ -469,41 +465,43 @@ namespace NamingFix
             return TraverseItems(_RenameItems, callBack);
         }
 
-        private bool TraverseItems(CRenameItemInterfaceBase itemInterface, HandleItem callBack)
+        private bool TraverseItems(IRenameItemContainer itemContainer, HandleItem callBack)
         {
-            CRenameItemClass itemClass = itemInterface as CRenameItemClass;
-            if (itemClass != null)
+            CRenameMethod itemMethod = itemContainer as CRenameMethod;
+            if (itemMethod != null)
             {
-                foreach (CRenameItemClass item in itemClass.Classes)
-                {
-                    if (!callBack(item))
-                        return false;
-                    if (!TraverseItems(item, callBack))
-                        return false;
-                }
-                foreach (CRenameItemInterface item in itemClass.Interfaces)
-                {
-                    if (!callBack(item))
-                        return false;
-                    if (!TraverseItems(item, callBack))
-                        return false;
-                }
-                if (itemClass.Enums.Any(item => !callBack(item)))
-                    return false;
-                if (itemClass.Structs.Any(item => !callBack(item)))
-                    return false;
-                if (itemClass.Variables.Any(item => !callBack(item)))
-                    return false;
-                if (itemClass.Delegates.Any(item => !callBack(item)))
+                if (!TraverseItems(itemMethod.Parameters, callBack))
                     return false;
             }
-            if (itemInterface.Properties.Any(item => !callBack(item)))
-                return false;
-            foreach (CRenameMethod item in itemInterface.Methods)
+            else
             {
-                if (item.Parameters.Any(param => !callBack(param)))
+                CRenameItemInterfaceBase itemInterface = (CRenameItemInterfaceBase)itemContainer;
+                CRenameItemClass itemClass = itemInterface as CRenameItemClass;
+                if (itemClass != null)
+                {
+                    if (!TraverseItems(itemClass.Classes, callBack) ||
+                        !TraverseItems(itemClass.Interfaces, callBack) ||
+                        !TraverseItems(itemClass.Enums, callBack) ||
+                        !TraverseItems(itemClass.Structs, callBack) ||
+                        !TraverseItems(itemClass.Variables, callBack) ||
+                        !TraverseItems(itemClass.Delegates, callBack))
+                        return false;
+                }
+                if (!TraverseItems(itemInterface.Properties, callBack) ||
+                    !TraverseItems(itemInterface.Methods, callBack))
                     return false;
+            }
+            return true;
+        }
+
+        private bool TraverseItems<T>(IEnumerable<T> list, HandleItem callBack) where T : CRenameItem
+        {
+            foreach (T item in list)
+            {
                 if (!callBack(item))
+                    return false;
+                IRenameItemContainer container = item as IRenameItemContainer;
+                if (container != null && !TraverseItems(container, callBack))
                     return false;
             }
             return true;

@@ -143,7 +143,7 @@ namespace NamingFix
 
     class CRenameItemClass : CRenameItemClassBase
     {
-        public CRenameItemClassBase InheritedStuff = new CRenameItemClassBase();
+        private readonly CRenameItemClassBase InheritedStuff = new CRenameItemClassBase();
 
         public bool IsInheritedLoaded;
 

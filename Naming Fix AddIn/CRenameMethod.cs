@@ -94,7 +94,7 @@ namespace NamingFix
             if (item is CRenameItemParameter)
                 Parameters.Add(item);
             else
-                throw new NotImplementedException();
+                throw new ArgumentException();
             item.Parent = this;
         }
 

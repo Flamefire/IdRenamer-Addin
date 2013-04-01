@@ -36,7 +36,7 @@ namespace NamingFix
             else if (item is CRenameItemProperty)
                 Properties.Add(item);
             else
-                throw new NotImplementedException();
+                throw new ArgumentException();
             item.Parent = this;
         }
 
@@ -73,7 +73,7 @@ namespace NamingFix
 
     class CRenameItemInterface : CRenameItemInterfaceBase
     {
-        public CRenameItemInterfaceBase InheritedStuff=new CRenameItemInterfaceBase();
+        private readonly CRenameItemInterfaceBase InheritedStuff=new CRenameItemInterfaceBase();
         public bool IsInheritedLoaded;
 
         public override bool ReadOnly
