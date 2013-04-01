@@ -118,7 +118,7 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="CNamingFix.cs" />
-    <Compile Include="CRenameFunction.cs" />
+    <Compile Include="CRenameMethod.cs" />
     <Compile Include="CRenameItem.cs" />
     <Compile Include="CRenameItemClass.cs" />
     <Compile Include="CRenameItemInterface.cs" />

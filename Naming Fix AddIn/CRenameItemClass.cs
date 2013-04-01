@@ -18,8 +18,6 @@
 #endregion
 
 using System;
-using System.Collections.Generic;
-using System.Linq;
 using EnvDTE80;
 
 namespace NamingFix
@@ -30,61 +28,60 @@ namespace NamingFix
     class CRenameItemClassBase : CRenameItemInterfaceBase
     {
         public bool IsTopClass;
-        public readonly List<CRenameItemClass> Classes = new List<CRenameItemClass>();
-        public readonly List<CRenameItemInterface> Interfaces = new List<CRenameItemInterface>();
-        public readonly List<CRenameItemStruct> Structs = new List<CRenameItemStruct>();
-        public readonly List<CRenameItemEnum> Enums = new List<CRenameItemEnum>();
-        public readonly List<CRenameItemDelegate> Delegates = new List<CRenameItemDelegate>();
-        public readonly List<CRenameItemVariable> Variables = new List<CRenameItemVariable>();
+        public readonly CRenameItemList<CRenameItemClass> Classes = new CRenameItemList<CRenameItemClass>();
+        public readonly CRenameItemList<CRenameItemInterface> Interfaces = new CRenameItemList<CRenameItemInterface>();
+        public readonly CRenameItemList<CRenameItemStruct> Structs = new CRenameItemList<CRenameItemStruct>();
+        public readonly CRenameItemList<CRenameItemEnum> Enums = new CRenameItemList<CRenameItemEnum>();
+        public readonly CRenameItemList<CRenameItemDelegate> Delegates = new CRenameItemList<CRenameItemDelegate>();
+        public readonly CRenameItemList<CRenameItemVariable> Variables = new CRenameItemList<CRenameItemVariable>();
 
         public override void Add(CRenameItem item)
         {
-            // ReSharper disable CanBeReplacedWithTryCastAndCheckForNull
             if (item is CRenameItemClass)
-                Classes.Add((CRenameItemClass)item);
+                Classes.Add(item);
             else if (item is CRenameItemInterface)
-                Interfaces.Add((CRenameItemInterface)item);
+                Interfaces.Add(item);
             else if (item is CRenameItemEnum)
-                Enums.Add((CRenameItemEnum)item);
+                Enums.Add(item);
             else if (item is CRenameItemStruct)
-                Structs.Add((CRenameItemStruct)item);
+                Structs.Add(item);
             else if (item is CRenameItemDelegate)
-                Delegates.Add((CRenameItemDelegate)item);
+                Delegates.Add(item);
             else if (item is CRenameItemVariable)
-                Variables.Add((CRenameItemVariable)item);
-            else base.Add(item);
+                Variables.Add(item);
+            else
+                base.Add(item);
             item.Parent = this;
-            // ReSharper restore CanBeReplacedWithTryCastAndCheckForNull
         }
 
-        public override void CopyIds(CRenameItemInterfaceBase otherItem, bool readOnly = false)
+        public override void CopyIds(CRenameItemInterfaceBase otherItem)
         {
-            base.CopyIds(otherItem, readOnly);
-            var otherItem2 = otherItem as CRenameItemClassBase;
+            base.CopyIds(otherItem);
+            CRenameItemClassBase otherItem2 = otherItem as CRenameItemClassBase;
             if (otherItem2 == null)
                 return;
-            AddUniqueItems(Variables, otherItem2.Variables, otherItem2.ReadOnly || readOnly);
-            AddUniqueItems(Classes, otherItem2.Classes, otherItem2.ReadOnly || readOnly);
-            AddUniqueItems(Interfaces, otherItem2.Interfaces, otherItem2.ReadOnly || readOnly);
-            AddUniqueItems(Enums, otherItem2.Enums, otherItem2.ReadOnly || readOnly);
-            AddUniqueItems(Structs, otherItem2.Structs, otherItem2.ReadOnly || readOnly);
-            AddUniqueItems(Delegates, otherItem2.Delegates, otherItem2.ReadOnly || readOnly);
+            AddUniqueItems(Variables, otherItem2.Variables, otherItem2.ReadOnly);
+            AddUniqueItems(Classes, otherItem2.Classes, otherItem2.ReadOnly);
+            AddUniqueItems(Interfaces, otherItem2.Interfaces, otherItem2.ReadOnly);
+            AddUniqueItems(Enums, otherItem2.Enums, otherItem2.ReadOnly);
+            AddUniqueItems(Structs, otherItem2.Structs, otherItem2.ReadOnly);
+            AddUniqueItems(Delegates, otherItem2.Delegates, otherItem2.ReadOnly);
         }
 
-        public override bool IdCollidesWithMember(string newName, string oldName)
+        public override bool IsMemberRenameValid(string newName, string oldName)
         {
-            return base.IdCollidesWithMember(newName, oldName) ||
-                   Variables.Any(item => item.NewName == newName && item.Name != oldName);
+            return base.IsMemberRenameValid(newName, oldName) &&
+                   Variables.IsRenameValid(newName, oldName);
         }
 
-        public override bool IdCollidesWithId(string newName, string oldName)
+        public override bool IsIdRenameValid(string newName, string oldName)
         {
-            return base.IdCollidesWithId(newName, oldName) ||
-                   Classes.Any(item => item.NewName == newName && item.Name != oldName) ||
-                   Interfaces.Any(item => item.NewName == newName && item.Name != oldName) ||
-                   Structs.Any(item => item.NewName == newName && item.Name != oldName) ||
-                    Enums.Any(item => item.NewName == newName && item.Name != oldName) ||
-                   Delegates.Any(item => item.NewName == newName && item.Name != oldName);
+            return base.IsIdRenameValid(newName, oldName) &&
+                   Classes.IsRenameValid(newName, oldName) &&
+                   Interfaces.IsRenameValid(newName, oldName) &&
+                   Structs.IsRenameValid(newName, oldName) &&
+                   Enums.IsRenameValid(newName, oldName) &&
+                   Delegates.IsRenameValid(newName, oldName);
         }
 
         private static void SplitTypeName(string className, out string topClass, out String subClass)
@@ -99,7 +96,7 @@ namespace NamingFix
             string mainType, subType;
             SplitTypeName(typeName, out mainType, out subType);
 
-            CRenameItemClass cClass = Classes.FirstOrDefault(item => item.Name == mainType);
+            CRenameItemClass cClass = Classes.Find(mainType);
             if (subType != "")
             {
                 //Only classes can have subTypes so either get down in this class or exit
@@ -108,16 +105,16 @@ namespace NamingFix
             if (cClass != null)
                 return cClass;
 
-            CRenameItem result = Interfaces.FirstOrDefault(item => item.Name == mainType);
+            CRenameItem result = Interfaces.Find(mainType);
             if (result != null)
                 return result;
-            result = Structs.FirstOrDefault(item => item.Name == mainType);
+            result = Structs.Find(mainType);
             if (result != null)
                 return result;
-            result = Enums.FirstOrDefault(item => item.Name == mainType);
+            result = Enums.Find(mainType);
             if (result != null)
                 return result;
-            result = Delegates.FirstOrDefault(item => item.Name == mainType);
+            result = Delegates.Find(mainType);
 
             return result;
         }
@@ -146,29 +143,40 @@ namespace NamingFix
 
     class CRenameItemClass : CRenameItemClassBase
     {
-        public CRenameItemClassBase InheritedStuff;
+        public CRenameItemClassBase InheritedStuff = new CRenameItemClassBase();
+
+        public bool IsInheritedLoaded;
+
+        public override bool ReadOnly
+        {
+            set
+            {
+                base.ReadOnly = value;
+                InheritedStuff.ReadOnly = value;
+            }
+        }
 
         public CodeClass2 GetElement()
         {
             return GetElement<CodeClass2>();
         }
 
-        public override void CopyIds(CRenameItemInterfaceBase otherItem, bool readOnly = false)
+        public override void CopyIds(CRenameItemInterfaceBase otherItem)
         {
-            InheritedStuff.CopyIds(otherItem, readOnly);
-            var otherItem2 = otherItem as CRenameItemClass;
+            InheritedStuff.CopyIds(otherItem);
+            CRenameItemClass otherItem2 = otherItem as CRenameItemClass;
             if (otherItem2 != null)
-                InheritedStuff.CopyIds(otherItem2.InheritedStuff, otherItem2.ReadOnly || readOnly);
+                InheritedStuff.CopyIds(otherItem2.InheritedStuff);
         }
 
-        public override bool IdCollidesWithMember(string newName, string oldName)
+        public override bool IsMemberRenameValid(string newName, string oldName)
         {
-            return base.IdCollidesWithMember(newName, oldName) || (InheritedStuff != null && InheritedStuff.IdCollidesWithMember(newName, oldName));
+            return base.IsMemberRenameValid(newName, oldName) || (InheritedStuff != null && InheritedStuff.IsMemberRenameValid(newName, oldName));
         }
 
-        public override bool IdCollidesWithId(string newName, string oldName)
+        public override bool IsIdRenameValid(string newName, string oldName)
         {
-            return base.IdCollidesWithId(newName, oldName) || (InheritedStuff != null && InheritedStuff.IdCollidesWithId(newName, oldName));
+            return base.IsIdRenameValid(newName, oldName) || (InheritedStuff != null && InheritedStuff.IsIdRenameValid(newName, oldName));
         }
 
         public override CRenameItem FindTypeByName(string typeName)

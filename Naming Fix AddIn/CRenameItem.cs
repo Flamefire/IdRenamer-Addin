@@ -17,6 +17,8 @@
 //  */
 #endregion
 
+using System.Collections.Generic;
+using System.Linq;
 using EnvDTE;
 using EnvDTE80;
 
@@ -36,12 +38,51 @@ namespace NamingFix
         }
         public string NewName;
         public CodeElement2 Element;
-        public IRenameItemInterface Parent;
+        public IRenameItemContainer Parent;
         public virtual bool ReadOnly { get; set; }
 
         protected T GetElement<T>()
         {
             return (T)Element;
+        }
+    }
+
+    interface IRenameItemContainer
+    {
+        void Add(CRenameItem item);
+
+        /// <summary>
+        ///     Checks if given Id collides with Member (Var/Property/Function) of this class and therefore is a invalid name
+        /// </summary>
+        /// <param name="newName"></param>
+        /// <param name="oldName"></param>
+        /// <returns></returns>
+        bool IsMemberRenameValid(string newName, string oldName);
+
+        /// <summary>
+        ///     Checks if given Id collides with any other Id (Var/Property/Function) of this class and therefore is a invalide type name
+        /// </summary>
+        /// <param name="newName"></param>
+        /// <param name="oldName"></param>
+        /// <returns></returns>
+        bool IsIdRenameValid(string newName, string oldName);
+    }
+
+    class CRenameItemList<T> : List<T> where T : CRenameItem
+    {
+        public void Add(CRenameItem item)
+        {
+            base.Add((T)item);
+        }
+
+        public bool IsRenameValid(string newName, string oldName)
+        {
+            return this.All(item => item.NewName != newName || item.Name == oldName);
+        }
+
+        public T Find(string name)
+        {
+            return this.FirstOrDefault(item => item.Name == name);
         }
     }
 

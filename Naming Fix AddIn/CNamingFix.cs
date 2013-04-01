@@ -35,7 +35,7 @@ namespace NamingFix
         private readonly DTE2 _Dte;
         private readonly OutputWindowPane _OutputWindow;
         private CRenameRuleSet _RuleSet;
-        private const string _Id = "[a-z_][a-z0-9_\\.]*";
+        private const string _Id = "@?[a-z_][a-z0-9_\\.]*";
         private static readonly Regex _ReLocVar = new Regex(@"(?<=[\{\(,;]\s*)((const\s+)?" + _Id + "(<" + _Id + @">)?)\s*(\[\])?\s+(" + _Id + @")(?=\s*([=,;]|( in )))",
                                                             RegexOptions.Compiled | RegexOptions.IgnoreCase | RegexOptions.Singleline);
         private static readonly Regex _ReUnderScore = new Regex("(?<=[a-z0-9])_[a-z0-9]", RegexOptions.Compiled | RegexOptions.IgnoreCase);
@@ -142,7 +142,7 @@ namespace NamingFix
         }
 
         //Iterate through all the code elements in the provided element
-        private void IterateCodeElements(CodeElements colCodeElements, IRenameItemInterface curParent)
+        private void IterateCodeElements(CodeElements colCodeElements, IRenameItemContainer curParent)
         {
             //Check for nonmutable object inheritance
             if (colCodeElements == null)
@@ -161,7 +161,7 @@ namespace NamingFix
                             cItem = new CRenameItemVariable();
                             break;
                         case vsCMElement.vsCMElementFunction:
-                            cItem = new CRenameFunction();
+                            cItem = new CRenameMethod();
                             CodeFunction2 func = (CodeFunction2)element;
 
                             foreach (CodeElement2 param in func.Parameters)
@@ -169,7 +169,7 @@ namespace NamingFix
                                 if (param.Kind == vsCMElement.vsCMElementParameter)
                                 {
                                     CRenameItemParameter cItem2 = new CRenameItemParameter {Name = param.Name, Element = param, Parent = curParent};
-                                    ((CRenameFunction)cItem).Parameters.Add(cItem2);
+                                    ((CRenameMethod)cItem).Parameters.Add(cItem2);
                                 }
                                 else
                                     Message("Found a non parameter in method " + element.Name + ":" + param.Name + ":" + param.Kind);
@@ -220,31 +220,32 @@ namespace NamingFix
 
         private void AddInheritedInfoToMembers(CRenameItemClass child)
         {
-            foreach (var item in child.Classes)
+            foreach (CRenameItemClass item in child.Classes)
                 GetInherited(item);
-            foreach (var item in child.Interfaces)
+            foreach (CRenameItemInterface item in child.Interfaces)
                 GetInherited(item);
         }
 
         private void GetInherited(CRenameItemClass child)
         {
-            if (child.InheritedStuff != null)
+            if (child.IsInheritedLoaded)
                 return;
             child.InheritedStuff = new CRenameItemClassBase();
             foreach (CodeElement2 baseClass in child.GetElement().Bases)
                 ProcessBaseElement<CRenameItemClass>(baseClass, child);
             foreach (CodeElement2 implInterface in child.GetElement().ImplementedInterfaces)
                 ProcessBaseElement<CRenameItemInterface>(implInterface, child);
+            child.IsInheritedLoaded = true;
             AddInheritedInfoToMembers(child);
         }
 
         private void GetInherited(CRenameItemInterface child)
         {
-            if (child.InheritedStuff != null)
+            if (child.IsInheritedLoaded)
                 return;
-            child.InheritedStuff = new CRenameItemInterfaceBase();
             foreach (CodeElement2 element in child.GetElement().Bases)
                 ProcessBaseElement<CRenameItemInterface>(element, child);
+            child.IsInheritedLoaded = true;
         }
 
         private void ProcessBaseElement<T>(CodeElement2 element, CRenameItemInterfaceBase child) where T : CRenameItemInterfaceBase, new()
@@ -269,7 +270,7 @@ namespace NamingFix
             }
 
             //Make sure, inheritance info is filled
-            var tmpClass = baseType as CRenameItemClass;
+            CRenameItemClass tmpClass = baseType as CRenameItemClass;
             if (tmpClass != null)
                 GetInherited(tmpClass);
             else
@@ -411,7 +412,7 @@ namespace NamingFix
                 item.NewName = GetNewName((CodeVariable2)item.Element);
             else if (item is CRenameItemProperty)
                 item.NewName = GetNewName((CodeProperty2)item.Element);
-            else if (item is CRenameFunction)
+            else if (item is CRenameMethod)
                 item.NewName = GetNewName((CodeFunction2)item.Element);
             return true;
         }
@@ -447,10 +448,10 @@ namespace NamingFix
             bool result;
             if (item is CRenameItemType)
                 //if item is a type then thre must not be another id with same name in that scope
-                result = !item.Parent.IdCollidesWithId(item.NewName, item.Name);
+                result = !item.Parent.IsIdRenameValid(item.NewName, item.Name);
             else
                 //if item is a variable, property or function then there must be no other v, p or f
-                result = !item.Parent.IdCollidesWithMember(item.NewName, item.Name);
+                result = !item.Parent.IsMemberRenameValid(item.NewName, item.Name);
             if (!result)
             {
                 Message("Cannot rename " + item.Name + " to " + item.NewName + " as another identifier already exists or is about to be renamed to the same name!");
@@ -477,13 +478,15 @@ namespace NamingFix
                 {
                     if (!callBack(item))
                         return false;
-                    TraverseItems(item, callBack);
+                    if (!TraverseItems(item, callBack))
+                        return false;
                 }
                 foreach (CRenameItemInterface item in itemClass.Interfaces)
                 {
                     if (!callBack(item))
                         return false;
-                    TraverseItems(item, callBack);
+                    if (!TraverseItems(item, callBack))
+                        return false;
                 }
                 if (itemClass.Enums.Any(item => !callBack(item)))
                     return false;
@@ -496,7 +499,7 @@ namespace NamingFix
             }
             if (itemInterface.Properties.Any(item => !callBack(item)))
                 return false;
-            foreach (CRenameFunction item in itemInterface.Functions)
+            foreach (CRenameMethod item in itemInterface.Methods)
             {
                 if (item.Parameters.Any(param => !callBack(param)))
                     return false;
@@ -511,7 +514,7 @@ namespace NamingFix
             return _TypeResolver.IsType(type) || _RenameItems.FindTypeByName(type) != null;
         }
 
-        private void RenameMethod(CRenameFunction func)
+        private void RenameMethod(CRenameMethod func)
         {
             string funcText = "{" + func.GetText();
             func.RemoveTextComments(ref funcText);

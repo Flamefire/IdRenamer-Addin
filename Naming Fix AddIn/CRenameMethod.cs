@@ -25,9 +25,9 @@ using EnvDTE80;
 
 namespace NamingFix
 {
-    class CRenameFunction : CRenameItem
+    class CRenameMethod : CRenameItem, IRenameItemContainer
     {
-        public readonly List<CRenameItemParameter> Parameters = new List<CRenameItemParameter>();
+        public readonly CRenameItemList<CRenameItemParameter> Parameters = new CRenameItemList<CRenameItemParameter>();
         private EditPoint _StartPt;
         private TextPoint _EndPt;
         private readonly List<string> _Strings = new List<string>();
@@ -87,6 +87,30 @@ namespace NamingFix
                 text = text.Replace("\"ReplacedStr:::" + i + ":::\"", _Strings[i]);
             for (int i = 0; i < _Comments.Count; i++)
                 text = text.Replace("//ReplacedCom:::" + i + ":::;\r\n", _Comments[i]);
+        }
+
+        public void Add(CRenameItem item)
+        {
+            if (item is CRenameItemParameter)
+                Parameters.Add(item);
+            else
+                throw new NotImplementedException();
+            item.Parent = this;
+        }
+
+        private bool IsMemberRenameValidInt(string newName, string oldName)
+        {
+            return Parameters.IsRenameValid(newName, oldName);
+        }
+
+        public bool IsMemberRenameValid(string newName, string oldName)
+        {
+            return IsMemberRenameValidInt(newName, oldName) && Parent.IsMemberRenameValid(newName, oldName);
+        }
+
+        public bool IsIdRenameValid(string newName, string oldName)
+        {
+            return IsMemberRenameValidInt(newName, oldName) && Parent.IsIdRenameValid(newName, oldName);
         }
     }
 }

@@ -24,54 +24,31 @@ using EnvDTE80;
 
 namespace NamingFix
 {
-    interface IRenameItemInterface
+    class CRenameItemInterfaceBase : CRenameItemType, IRenameItemContainer
     {
-        void Add(CRenameItem item);
-
-        /// <summary>
-        ///     Checks if given Id collides with Member (Var/Property/Function) of this class and therfore is a invalid name
-        /// </summary>
-        /// <param name="newName"></param>
-        /// <param name="oldName"></param>
-        /// <returns></returns>
-        bool IdCollidesWithMember(string newName, string oldName);
-
-        /// <summary>
-        ///     Checks if given Id collides with any other Id (Var/Property/Function) of this class and therefore is a invalide type name
-        /// </summary>
-        /// <param name="newName"></param>
-        /// <param name="oldName"></param>
-        /// <returns></returns>
-        bool IdCollidesWithId(string newName, string oldName);
-    }
-
-    class CRenameItemInterfaceBase : CRenameItemType, IRenameItemInterface
-    {
-        public readonly List<CRenameFunction> Functions = new List<CRenameFunction>();
-        public readonly List<CRenameItemProperty> Properties = new List<CRenameItemProperty>();
+        public readonly CRenameItemList<CRenameMethod> Methods = new CRenameItemList<CRenameMethod>();
+        public readonly CRenameItemList<CRenameItemProperty> Properties = new CRenameItemList<CRenameItemProperty>();
 
         public virtual void Add(CRenameItem item)
         {
-            // ReSharper disable CanBeReplacedWithTryCastAndCheckForNull
-            if (item is CRenameFunction)
-                Functions.Add((CRenameFunction)item);
+            if (item is CRenameMethod)
+                Methods.Add(item);
             else if (item is CRenameItemProperty)
-                Properties.Add((CRenameItemProperty)item);
+                Properties.Add(item);
             else
                 throw new NotImplementedException();
             item.Parent = this;
-            // ReSharper restore CanBeReplacedWithTryCastAndCheckForNull
         }
 
-        public virtual void CopyIds(CRenameItemInterfaceBase otherItem, bool readOnly = false)
+        public virtual void CopyIds(CRenameItemInterfaceBase otherItem)
         {
-            AddUniqueItems(Functions, otherItem.Functions, otherItem.ReadOnly || readOnly);
-            AddUniqueItems(Properties, otherItem.Properties, otherItem.ReadOnly || readOnly);
+            AddUniqueItems(Methods, otherItem.Methods, otherItem.ReadOnly);
+            AddUniqueItems(Properties, otherItem.Properties, otherItem.ReadOnly);
         }
 
         protected void AddUniqueItems<T>(List<T> list, List<T> listOther, bool readOnly) where T : CRenameItem
         {
-            foreach (var itemOther in listOther)
+            foreach (T itemOther in listOther)
             {
                 if (list.Any(item => item.Name == itemOther.Name))
                     continue;
@@ -80,44 +57,53 @@ namespace NamingFix
             }
         }
 
-        public virtual bool IdCollidesWithMember(string newName, string oldName)
+        public virtual bool IsMemberRenameValid(string newName, string oldName)
         {
-            return Functions.Any(item => item.NewName == newName && item.Name != oldName) ||
-                   Properties.Any(item => item.NewName == newName && item.Name != oldName);
+            return Methods.IsRenameValid(newName, oldName) &&
+                   Properties.IsRenameValid(newName, oldName);
         }
 
-        public virtual bool IdCollidesWithId(string newName, string oldName)
+        public virtual bool IsIdRenameValid(string newName, string oldName)
         {
-            return (NewName == newName && Name != oldName) || IdCollidesWithMember(newName, oldName) ||
-                   (Parent != null && Parent.IdCollidesWithId(newName, oldName));
+            return (NewName != newName || Name == oldName) &&
+                   IsMemberRenameValid(newName, oldName) &&
+                   (Parent == null || Parent.IsIdRenameValid(newName, oldName));
         }
     }
 
     class CRenameItemInterface : CRenameItemInterfaceBase
     {
-        public CRenameItemInterfaceBase InheritedStuff;
+        public CRenameItemInterfaceBase InheritedStuff=new CRenameItemInterfaceBase();
+        public bool IsInheritedLoaded;
+
+        public override bool ReadOnly
+        {
+            set { base.ReadOnly = value;
+                InheritedStuff.ReadOnly = value;
+            }
+        }
 
         public CodeInterface2 GetElement()
         {
             return GetElement<CodeInterface2>();
         }
 
-        public override void CopyIds(CRenameItemInterfaceBase otherItem, bool readOnly = false)
+        public override void CopyIds(CRenameItemInterfaceBase otherItem)
         {
-            InheritedStuff.CopyIds(otherItem, readOnly);
-            var otherItem2 = otherItem as CRenameItemInterface;
+            InheritedStuff.CopyIds(otherItem);
+            CRenameItemInterface otherItem2 = otherItem as CRenameItemInterface;
             if (otherItem2 != null)
-                InheritedStuff.CopyIds(otherItem2.InheritedStuff, otherItem2.ReadOnly || readOnly);
+                InheritedStuff.CopyIds(otherItem2.InheritedStuff);
         }
 
-        public override bool IdCollidesWithMember(string newName, string oldName)
+        public override bool IsMemberRenameValid(string newName, string oldName)
         {
-            return base.IdCollidesWithMember(newName, oldName) || (InheritedStuff != null && InheritedStuff.IdCollidesWithMember(newName, oldName));
+            return base.IsMemberRenameValid(newName, oldName) || (InheritedStuff != null && InheritedStuff.IsMemberRenameValid(newName, oldName));
         }
 
-        public override bool IdCollidesWithId(string newName, string oldName)
+        public override bool IsIdRenameValid(string newName, string oldName)
         {
-            return base.IdCollidesWithId(newName, oldName) || (InheritedStuff != null && InheritedStuff.IdCollidesWithId(newName, oldName));
+            return base.IsIdRenameValid(newName, oldName) || (InheritedStuff != null && InheritedStuff.IsIdRenameValid(newName, oldName));
         }
     }
 }
