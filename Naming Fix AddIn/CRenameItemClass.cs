@@ -27,13 +27,26 @@ namespace NamingFix
     /// </summary>
     class CRenameItemClassBase : CRenameItemInterfaceBase
     {
-        public bool IsTopClass;
         public readonly CRenameItemList<CRenameItemClass> Classes = new CRenameItemList<CRenameItemClass>();
         public readonly CRenameItemList<CRenameItemInterface> Interfaces = new CRenameItemList<CRenameItemInterface>();
         public readonly CRenameItemList<CRenameItemStruct> Structs = new CRenameItemList<CRenameItemStruct>();
         public readonly CRenameItemList<CRenameItemEnum> Enums = new CRenameItemList<CRenameItemEnum>();
         public readonly CRenameItemList<CRenameItemDelegate> Delegates = new CRenameItemList<CRenameItemDelegate>();
         public readonly CRenameItemList<CRenameItemVariable> Variables = new CRenameItemList<CRenameItemVariable>();
+
+        public override bool IsSystem
+        {
+            set
+            {
+                base.IsSystem = value;
+                Classes.ForEach(item => item.IsSystem = value);
+                Interfaces.ForEach(item => item.IsSystem = value);
+                Structs.ForEach(item => item.IsSystem = value);
+                Enums.ForEach(item => item.IsSystem = value);
+                Delegates.ForEach(item => item.IsSystem = value);
+                Variables.ForEach(item => item.IsSystem = value);
+            }
+        }
 
         public override void Add(CRenameItem item)
         {
@@ -52,6 +65,23 @@ namespace NamingFix
             else
                 base.Add(item);
             item.Parent = this;
+            item.IsSystem = IsSystem;
+        }
+
+        public override bool IsConflictType(string newName, string oldName)
+        {
+            return Classes.IsConflict(newName, oldName) ||
+                   Interfaces.IsConflict(newName, oldName) ||
+                   Structs.IsConflict(newName, oldName) ||
+                   Enums.IsConflict(newName, oldName) ||
+                   Delegates.IsConflict(newName, oldName) ||
+                   base.IsConflictType(newName, oldName);
+        }
+
+        public override bool IsConflictId(string newName, string oldName)
+        {
+            return Variables.IsConflict(newName, oldName) ||
+                   base.IsConflictId(newName, oldName);
         }
 
         public override void CopyIds(CRenameItemInterfaceBase otherItem)
@@ -60,38 +90,15 @@ namespace NamingFix
             CRenameItemClassBase otherItem2 = otherItem as CRenameItemClassBase;
             if (otherItem2 == null)
                 return;
-            AddUniqueItems(Variables, otherItem2.Variables, otherItem2.ReadOnly);
-            AddUniqueItems(Classes, otherItem2.Classes, otherItem2.ReadOnly);
-            AddUniqueItems(Interfaces, otherItem2.Interfaces, otherItem2.ReadOnly);
-            AddUniqueItems(Enums, otherItem2.Enums, otherItem2.ReadOnly);
-            AddUniqueItems(Structs, otherItem2.Structs, otherItem2.ReadOnly);
-            AddUniqueItems(Delegates, otherItem2.Delegates, otherItem2.ReadOnly);
+            Variables.AddRange(otherItem2.Variables);
+            Classes.AddRange(otherItem2.Classes);
+            Interfaces.AddRange(otherItem2.Interfaces);
+            Enums.AddRange(otherItem2.Enums);
+            Structs.AddRange(otherItem2.Structs);
+            Delegates.AddRange(otherItem2.Delegates);
         }
 
-        public override bool IsMemberRenameValid(string newName, string oldName)
-        {
-            return base.IsMemberRenameValid(newName, oldName) &&
-                   Variables.IsRenameValid(newName, oldName);
-        }
-
-        public override bool IsIdRenameValid(string newName, string oldName)
-        {
-            return base.IsIdRenameValid(newName, oldName) &&
-                   Classes.IsRenameValid(newName, oldName) &&
-                   Interfaces.IsRenameValid(newName, oldName) &&
-                   Structs.IsRenameValid(newName, oldName) &&
-                   Enums.IsRenameValid(newName, oldName) &&
-                   Delegates.IsRenameValid(newName, oldName);
-        }
-
-        private static void SplitTypeName(string className, out string topClass, out String subClass)
-        {
-            int p = className.IndexOf('.');
-            topClass = (p >= 0) ? className.Substring(0, p) : className;
-            subClass = (p >= 0) ? className.Substring(p + 1) : "";
-        }
-
-        private CRenameItem FindTypeNameDown(String typeName)
+        protected override CRenameItem FindTypeNameDown(String typeName)
         {
             string mainType, subType;
             SplitTypeName(typeName, out mainType, out subType);
@@ -119,42 +126,12 @@ namespace NamingFix
             return result;
         }
 
-        public override CRenameItem FindTypeByName(string typeName)
-        {
-            //Strip redundant own typename
-            //This is only valid where the id has been defined so do it here
-            string mainType, subType;
-            SplitTypeName(typeName, out mainType, out subType);
-            if (mainType == Name)
-            {
-                if (subType == "")
-                    return this;
-                typeName = subType;
-            }
-            CRenameItem result = FindTypeNameDown(typeName);
-            if (result != null)
-                return result;
-            if (Parent != null)
-                return ((CRenameItemClass)Parent).FindTypeByName(typeName);
-            //Assume we have a namespace and we are in top class
-            return (subType == "" || !IsTopClass) ? null : FindTypeByName(subType);
-        }
     }
 
     class CRenameItemClass : CRenameItemClassBase
     {
-        private readonly CRenameItemClassBase InheritedStuff = new CRenameItemClassBase();
-
-        public bool IsInheritedLoaded;
-
-        public override bool ReadOnly
-        {
-            set
-            {
-                base.ReadOnly = value;
-                InheritedStuff.ReadOnly = value;
-            }
-        }
+        private readonly CRenameItemClassBase _InheritedStuff = new CRenameItemClassBase();
+        private readonly CRenameItemClassBase _DerivedStuff = new CRenameItemClassBase();
 
         public CodeClass2 GetElement()
         {
@@ -163,28 +140,39 @@ namespace NamingFix
 
         public override void CopyIds(CRenameItemInterfaceBase otherItem)
         {
-            InheritedStuff.CopyIds(otherItem);
+            _InheritedStuff.CopyIds(otherItem);
             CRenameItemClass otherItem2 = otherItem as CRenameItemClass;
             if (otherItem2 != null)
-                InheritedStuff.CopyIds(otherItem2.InheritedStuff);
+                _InheritedStuff.CopyIds(otherItem2._InheritedStuff);
         }
 
-        public override bool IsMemberRenameValid(string newName, string oldName)
+        public override void CopyIdsDerived(CRenameItemInterfaceBase otherItem)
         {
-            return base.IsMemberRenameValid(newName, oldName) || (InheritedStuff != null && InheritedStuff.IsMemberRenameValid(newName, oldName));
-        }
-
-        public override bool IsIdRenameValid(string newName, string oldName)
-        {
-            return base.IsIdRenameValid(newName, oldName) || (InheritedStuff != null && InheritedStuff.IsIdRenameValid(newName, oldName));
+            _DerivedStuff.CopyIds(otherItem);
+            CRenameItemClass otherItem2 = otherItem as CRenameItemClass;
+            if (otherItem2 != null)
+                _DerivedStuff.CopyIds(otherItem2._DerivedStuff);
         }
 
         public override CRenameItem FindTypeByName(string typeName)
         {
             CRenameItem result = base.FindTypeByName(typeName);
-            if (result != null)
-                return result;
-            return InheritedStuff != null ? InheritedStuff.FindTypeByName(typeName) : null;
+            return result ?? _InheritedStuff.FindTypeByName(typeName);
+        }
+
+        public override bool IsConflictLocVar(string newName, string oldName)
+        {
+            return base.IsConflictLocVar(newName, oldName) || _InheritedStuff.IsConflictLocVar(newName, oldName) || _DerivedStuff.IsConflictLocVar(newName, oldName);
+        }
+
+        public override bool IsConflictType(string newName, string oldName)
+        {
+            return base.IsConflictType(newName, oldName) || _InheritedStuff.IsConflictType(newName, oldName) || _DerivedStuff.IsConflictType(newName, oldName);
+        }
+
+        public override bool IsConflictId(string newName, string oldName)
+        {
+            return base.IsConflictId(newName, oldName) || _InheritedStuff.IsConflictId(newName, oldName) || _DerivedStuff.IsConflictId(newName, oldName);
         }
     }
 }

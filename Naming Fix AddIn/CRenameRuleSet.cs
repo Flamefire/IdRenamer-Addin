@@ -50,8 +50,9 @@ namespace NamingFix
             Interface,
             Class,
             Enum,
-            Struct;
-        public SRenameRule[]
+            Struct,
+            Event;
+        public readonly SRenameRule[]
             Const,
             Field,
             Property,
@@ -70,6 +71,14 @@ namespace NamingFix
             Field[Priv].Prefix = "_";
             Method[Priv].Prefix = "_";
             Property[Priv].Prefix = "_";
+            Const[Prot].RemovePrefix = "_";
+            Field[Prot].RemovePrefix = "_";
+            Method[Prot].RemovePrefix = "_";
+            Property[Prot].RemovePrefix = "_";
+            Const[Pub].RemovePrefix = "_";
+            Field[Pub].RemovePrefix = "_";
+            Method[Pub].RemovePrefix = "_";
+            Property[Pub].RemovePrefix = "_";
             Interface.Prefix = "I";
             Class.Prefix = "C";
             Enum.Prefix = "E";

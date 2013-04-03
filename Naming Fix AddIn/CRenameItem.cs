@@ -24,8 +24,9 @@ using EnvDTE80;
 
 namespace NamingFix
 {
-    class CRenameItem
+    abstract class CRenameItem
     {
+        public virtual bool IsSystem { get; set; }
         private string _Name;
         public string Name
         {
@@ -37,35 +38,82 @@ namespace NamingFix
             }
         }
         public string NewName;
-        public CodeElement2 Element;
-        public IRenameItemContainer Parent;
-        public virtual bool ReadOnly { get; set; }
+        public IRenameItemContainer Parent { get; set; }
+        public abstract ProjectItem ProjectItem { get; }
+        public abstract TextPoint StartPoint { get; }
+        public abstract TextPoint EndPoint { get; }
+
+        public abstract void Rename();
+        public abstract bool IsRenameValid();
+
+        public string GetTypeName()
+        {
+            return GetType().Name.Substring("CRenameItem".Length);
+        }
+    }
+
+    abstract class CRenameItemElement : CRenameItem
+    {
+        private CodeElement _Element;
+        public CodeElement Element
+        {
+            private get { return _Element; }
+            set
+            {
+                _Element = value;
+                Name = value.Name;
+            }
+        }
 
         protected T GetElement<T>()
         {
             return (T)Element;
         }
+
+        public override ProjectItem ProjectItem
+        {
+            get { return _Element.ProjectItem; }
+        }
+        public override TextPoint StartPoint
+        {
+            get { return _Element.StartPoint; }
+        }
+        public override TextPoint EndPoint
+        {
+            get { return _Element.EndPoint; }
+        }
+
+        public override void Rename()
+        {
+            if (NewName == Name)
+                return;
+            CodeElement2 element2 = Element as CodeElement2;
+            if (element2 == null)
+                return;
+            element2.RenameSymbol(NewName);
+            Name = NewName;
+        }
     }
 
     interface IRenameItemContainer
     {
+        string Name { get; }
         void Add(CRenameItem item);
 
         /// <summary>
-        ///     Checks if given Id collides with Member (Var/Property/Function) of this class and therefore is a invalid name
+        ///     Checks if given Id collides with local variable
         /// </summary>
-        /// <param name="newName"></param>
-        /// <param name="oldName"></param>
-        /// <returns></returns>
-        bool IsMemberRenameValid(string newName, string oldName);
+        bool IsConflictLocVar(string newName, string oldName);
 
         /// <summary>
-        ///     Checks if given Id collides with any other Id (Var/Property/Function) of this class and therefore is a invalide type name
+        ///     Checks if given Id collides with type
         /// </summary>
-        /// <param name="newName"></param>
-        /// <param name="oldName"></param>
-        /// <returns></returns>
-        bool IsIdRenameValid(string newName, string oldName);
+        bool IsConflictType(string newName, string oldName);
+
+        /// <summary>
+        ///     Checks if given Id collides with Id(Property, Variable, Function)
+        /// </summary>
+        bool IsConflictId(string newName, string oldName);
     }
 
     class CRenameItemList<T> : List<T> where T : CRenameItem
@@ -75,9 +123,9 @@ namespace NamingFix
             base.Add((T)item);
         }
 
-        public bool IsRenameValid(string newName, string oldName)
+        public bool IsConflict(string newName, string oldName)
         {
-            return this.All(item => item.NewName != newName || item.Name == oldName);
+            return this.Any(item => item.NewName == newName && item.Name != oldName);
         }
 
         public T Find(string name)
@@ -86,7 +134,17 @@ namespace NamingFix
         }
     }
 
-    class CRenameItemProperty : CRenameItem
+    abstract class CRenameItemVariableBase : CRenameItemElement
+    {
+        public override bool IsRenameValid()
+        {
+            if (Name == NewName)
+                return true;
+            return !Parent.IsConflictLocVar(NewName, Name) && !Parent.IsConflictId(NewName, Name);
+        }
+    }
+
+    class CRenameItemParameter : CRenameItemVariableBase
     {
         public CodeVariable2 GetElement()
         {
@@ -94,15 +152,31 @@ namespace NamingFix
         }
     }
 
-    class CRenameItemVariable : CRenameItemProperty {}
-
-    class CRenameItemParameter : CRenameItemVariable {}
-
-    class CRenameItemType : CRenameItem
+    class CRenameItemProperty : CRenameItemVariableBase
     {
-        public virtual CRenameItem FindTypeByName(string typeName)
+        public CodeProperty2 GetElement()
         {
-            return Name == typeName ? this : null;
+            return GetElement<CodeProperty2>();
+        }
+    }
+
+    class CRenameItemVariable : CRenameItemParameter {}
+
+    class CRenameItemType : CRenameItemElement
+    {
+        public override bool IsRenameValid()
+        {
+            if (Name == NewName)
+                return true;
+            return !Parent.IsConflictType(NewName, Name);
+        }
+    }
+
+    class CRenameItemEvent : CRenameItemType
+    {
+        public CodeEvent GetElement()
+        {
+            return GetElement<CodeEvent>();
         }
     }
 
