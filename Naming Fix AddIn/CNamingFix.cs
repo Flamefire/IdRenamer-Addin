@@ -17,14 +17,14 @@
 //  */
 #endregion
 
+using EnvDTE;
+using EnvDTE80;
 using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
 using System.Text.RegularExpressions;
 using System.Windows.Forms;
-using EnvDTE;
-using EnvDTE80;
 
 namespace NamingFix
 {
@@ -56,13 +56,14 @@ namespace NamingFix
         private static readonly Regex _ReMultiCaps = new Regex("[A-Z]{2,}", RegexOptions.Compiled);
         private static readonly Regex _ReEndsWithNoCaps = new Regex("[a-z]$", RegexOptions.Compiled);
 
-        private CRenameItemClass _RenameItems;
+        private CRenameItemNamespace _RenameItems;
         private readonly Dictionary<string, CRenameItemInterfaceBase> _SysClassCache = new Dictionary<string, CRenameItemInterfaceBase>();
 
         public static readonly List<String> FoundTypes = new List<string>();
 
-        private static readonly CTypeResolver _TypeResolver = new CTypeResolver();
-        private static readonly Form1 _StatusForm = new Form1();
+        private readonly CFormStatus _StatusForm = new CFormStatus();
+        private readonly CFormConflicts _FormConflicts = new CFormConflicts();
+        public static readonly List<CRenameItem> Conflicts = new List<CRenameItem>();
         private static int _ElCount;
         private const string _TmpPrefix = "RNFTMPPRE";
         private System.Threading.Thread _WorkerThread;
@@ -78,7 +79,7 @@ namespace NamingFix
             OutputWindow outputWindow = (OutputWindow)window.Object;
             _OutputWindow = outputWindow.OutputWindowPanes.Add("new pane");
             _StatusForm.pbMain.Maximum = 5;
-            _UpdateTimer.Interval = 30;
+            _UpdateTimer.Interval = 50;
             _UpdateTimer.Tick += Timer_ShowStatus;
         }
 
@@ -92,6 +93,7 @@ namespace NamingFix
             if (_WorkerThread != null)
                 return;
             _OutputWindow.Clear();
+            _FormConflicts.Hide();
             _WorkStatus.MainValue = 0;
             _WorkStatus.SetText("Initializing", false);
             _WorkStatus.Exception = "";
@@ -111,6 +113,8 @@ namespace NamingFix
                 _WorkerThread = null;
                 if (_WorkStatus.Exception != "")
                     MessageBox.Show(_WorkStatus.Exception, "Exception occured", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                else
+                    ShowConflicts();
             }
             else
                 ShowStatus();
@@ -121,7 +125,8 @@ namespace NamingFix
             _StatusForm.pbMain.Value = _WorkStatus.MainValue;
             int value = _WorkStatus.SubValue;
             _StatusForm.pbSub.Maximum = _WorkStatus.SubMax;
-            _StatusForm.pbSub.Value = value;
+            if (value <= _StatusForm.pbSub.Maximum)
+                _StatusForm.pbSub.Value = value;
             _StatusForm.lblText.Text = _WorkStatus.Text;
         }
 
@@ -130,15 +135,17 @@ namespace NamingFix
             _Dte.UndoContext.Open("Item renaming");
             try
             {
-                _TypeResolver.AddTypes();
+                CTypeResolver.AddTypes();
+                FoundTypes.Clear();
+                Conflicts.Clear();
                 BuildClassTree();
                 _RuleSet = new CRenameRuleSet();
                 SetNewNames();
-                CheckChanges();
-
+                if (CheckChanges())
+                    ApplyChanges();
 
                 Message("\r\nFound local var types:");
-                foreach (string type in FoundTypes.Where(type => !_TypeResolver.IsType(type)))
+                foreach (string type in FoundTypes.Where(type => !CTypeResolver.IsType(type)))
                     Message(type);
                 Message("IMPORTANT: Check if all found types above are actual types otherwhise use undo and fix addin!");
             }
@@ -147,6 +154,21 @@ namespace NamingFix
                 _WorkStatus.Exception = "Exception occured!:\r\n" + exception.Message;
             }
             _Dte.UndoContext.Close();
+        }
+
+        private void ShowConflicts()
+        {
+            if (Conflicts.Count == 0)
+                return;
+            _FormConflicts.lbConflicts.Items.Clear();
+            foreach (CRenameItem item in Conflicts)
+            {
+                string name = item.Name;
+                if (!string.IsNullOrEmpty(item.Parent.Name))
+                    name += " in " + item.Parent.Name;
+                _FormConflicts.lbConflicts.Items.Add(item.GetTypeName() + " " + name + " --> " + item.NewName);
+            }
+            _FormConflicts.Show();
         }
 
         #region BuildClassTree
@@ -159,7 +181,7 @@ namespace NamingFix
         private void BuildClassTree()
         {
             _WorkStatus.SetText("Gathering classes");
-            _RenameItems = new CRenameItemClass {IsTopClass = true};
+            _RenameItems = new CRenameItemNamespace();
             _SysClassCache.Clear();
             _WorkStatus.SubMax = _Dte.Solution.Projects.Count * 101;
             foreach (Project project in _Dte.Solution.Projects)
@@ -169,9 +191,9 @@ namespace NamingFix
                 _WorkStatus.SubValue++;
             }
             _WorkStatus.SetText("Gathering class inheritance info");
-            _WorkStatus.SubMax = 0;
+            _WorkStatus.SubMax = 21;
             _ElCount = 0;
-            TraverseItems(CountElems);
+            TraverseItemContainer(CountElems);
             AddInheritedInfoToMembers(_RenameItems);
         }
 
@@ -198,7 +220,7 @@ namespace NamingFix
         }
 
         //Iterate through all the code elements in the provided element
-        private static void IterateCodeElements(CodeElements colCodeElements, IRenameItemContainer curParent)
+        private void IterateCodeElements(CodeElements colCodeElements, IRenameItemContainer curParent)
         {
             //Check for nonmutable object inheritance
             if (colCodeElements == null)
@@ -235,7 +257,8 @@ namespace NamingFix
                             break;
                         case vsCMElement.vsCMElementNamespace:
                             CodeNamespace objCodeNamespace = (CodeNamespace)element;
-                            IterateCodeElements(objCodeNamespace.Members, curParent);
+                            CRenameItemNamespace ns = ((CRenameItemNamespace)curParent).AddOrGetNamespace(element.Name, element);
+                            IterateCodeElements(objCodeNamespace.Members, ns);
                             break;
                         case vsCMElement.vsCMElementClass:
                             cItem = new CRenameItemClass();
@@ -265,7 +288,7 @@ namespace NamingFix
 
         private void AddInheritedInfoToMembers(CRenameItemClass child)
         {
-            _WorkStatus.SubMax += child.Classes.Count + child.Interfaces.Count;
+            _WorkStatus.SubMax += child.Classes.Count * 6 + child.Interfaces.Count - 5;
             foreach (CRenameItemClass item in child.Classes)
             {
                 GetInherited(item);
@@ -274,6 +297,26 @@ namespace NamingFix
             foreach (CRenameItemInterface item in child.Interfaces)
             {
                 GetInherited(item);
+                _WorkStatus.SubValue++;
+            }
+        }
+
+        private void AddInheritedInfoToMembers(CRenameItemNamespace child)
+        {
+            _WorkStatus.SubMax += child.Classes.Count * 6 + child.Interfaces.Count + child.Namespaces.Count * 21 - 20;
+            foreach (CRenameItemClass item in child.Classes)
+            {
+                GetInherited(item);
+                _WorkStatus.SubValue++;
+            }
+            foreach (CRenameItemInterface item in child.Interfaces)
+            {
+                GetInherited(item);
+                _WorkStatus.SubValue++;
+            }
+            foreach (CRenameItemNamespace item in child.Namespaces)
+            {
+                AddInheritedInfoToMembers(item);
                 _WorkStatus.SubValue++;
             }
         }
@@ -304,12 +347,12 @@ namespace NamingFix
         private void ProcessBaseElement<T>(CodeElement element, CRenameItemInterfaceBase child) where T : CRenameItemInterfaceBase, new()
         {
             //Look for (programmer-defined) project class
-            T baseType = (T)child.FindTypeByName(element.Name);
+            T baseType = (T)_RenameItems.FindTypeByName(element.FullName);
             if (baseType == null)
             {
                 //Class is system or extern class
                 CRenameItemInterfaceBase tmp;
-                if (_SysClassCache.TryGetValue(element.Name, out tmp))
+                if (_SysClassCache.TryGetValue(element.FullName, out tmp))
                     baseType = (T)tmp;
                 else
                 {
@@ -318,7 +361,7 @@ namespace NamingFix
                         IterateCodeElements(((CodeClass2)element).Members, baseType);
                     else
                         IterateCodeElements(((CodeInterface2)element).Members, baseType);
-                    _SysClassCache.Add(element.Name, baseType);
+                    _SysClassCache.Add(element.FullName, baseType);
                 }
             }
 
@@ -468,9 +511,9 @@ namespace NamingFix
                 SetNewName(item, _RuleSet.Struct);
             else if (item is CRenameItemEvent)
                 SetNewName(item, _RuleSet.Event);
-            else if (item is CRenameItemLocVar)
+            else if (item is CRenameItemLocalVariable)
             {
-                if (((CRenameItemLocVar)item).IsConst)
+                if (((CRenameItemLocalVariable)item).IsConst)
                     SetNewName(item, _RuleSet.LokalConst);
                 else
                     SetNewName(item, _RuleSet.LokalVariable);
@@ -491,18 +534,19 @@ namespace NamingFix
         {
             _WorkStatus.SetText("Calculating new names");
             _WorkStatus.SubMax = _ElCount;
-            TraverseItems(SetNewName);
+            TraverseItemContainer(SetNewName);
         }
         #endregion
 
+        #region ApplyChanges
         private bool ApplyChangesPre(CRenameItem item)
         {
             _WorkStatus.SubValue++;
-            if (!(item is CRenameItemLocVar))
+            if (!(item is CRenameItemLocalVariable))
             {
                 if (item.Name != item.NewName)
                 {
-                    item.NewName = item.GetTypeName() + _TmpPrefix + item.NewName;
+                    item.NewName = _TmpPrefix + item.NewName;
                     item.Rename();
                 }
             }
@@ -516,21 +560,21 @@ namespace NamingFix
             if (method != null)
             {
                 method.ReloadText();
-                foreach (var localVar in method.LocalVars)
+                foreach (CRenameItemLocalVariable localVar in method.LocalVars)
                     localVar.Rename();
                 method.ApplyNewText();
             }
             return true;
         }
 
-        private bool ApplyChangesPost(CRenameItem item)
+        private static bool ApplyChangesPost(CRenameItem item)
         {
             _WorkStatus.SubValue++;
-            if (!(item is CRenameItemLocVar))
+            if (!(item is CRenameItemLocalVariable))
             {
                 if (item.Name != item.NewName)
                 {
-                    item.NewName = item.NewName.Substring(item.NewName.IndexOf(_TmpPrefix, StringComparison.Ordinal));
+                    item.NewName = item.NewName.Substring(_TmpPrefix.Length);
                     item.Rename();
                 }
             }
@@ -540,12 +584,13 @@ namespace NamingFix
         private bool ApplyChanges()
         {
             _WorkStatus.SubMax = _ElCount * 3;
-            return TraverseItems(ApplyChangesPre) &&
-                   TraverseItems(ApplyChangesLocalVar) &&
-                   TraverseItems(ApplyChangesPost);
+            return TraverseItemContainer(ApplyChangesPre) &&
+                   TraverseItemContainer(ApplyChangesLocalVar) &&
+                   TraverseItemContainer(ApplyChangesPost);
         }
+        #endregion
 
-        private bool CheckChanges(CRenameItem item)
+        private static bool CheckChanges(CRenameItem item)
         {
             _WorkStatus.SubValue++;
             if (item.IsRenameValid())
@@ -555,68 +600,77 @@ namespace NamingFix
                 name = item.Parent.Name + "." + name;
             Message("Cannot rename " + item.GetTypeName() + " " + name + " to " + item.NewName +
                     " as another identifier with the same name already exists or is about to be renamed to the same name!");
-            if (item.ProjectItem.Document == null || item.ProjectItem.Document.Windows.Count == 0)
-                item.ProjectItem.Open(Constants.vsViewKindCode);
-            item.StartPoint.TryToShow(vsPaneShowHow.vsPaneShowTop);
+            Conflicts.Add(item);
             return true;
         }
 
         private bool CheckChanges()
         {
             _WorkStatus.SetText("Validating changes");
-            return TraverseItems(CheckChanges);
+            return TraverseItemContainer(CheckChanges);
         }
 
+        #region TraverseItems
         private delegate bool HandleItem(CRenameItem item);
 
-        private bool TraverseItems(HandleItem callBack)
+        private bool TraverseItemContainer(HandleItem callBack)
         {
-            return TraverseItems(_RenameItems, callBack);
+            return TraverseItemContainer(_RenameItems, callBack);
         }
 
-        private bool TraverseItems(IRenameItemContainer itemContainer, HandleItem callBack)
+        private bool TraverseItemContainer(IRenameItemContainer itemContainer, HandleItem callBack)
         {
             CRenameItemMethod itemMethod = itemContainer as CRenameItemMethod;
             if (itemMethod != null)
             {
-                if (!TraverseItems(itemMethod.Parameters, callBack))
-                    return false;
-                if (!TraverseItems(itemMethod.LocalVars, callBack))
-                    return false;
+                return TraverseItemList(itemMethod.Parameters, callBack) &&
+                       TraverseItemList(itemMethod.LocalVars, callBack);
             }
-            else
+            CRenameItemInterfaceBase itemInterface = (CRenameItemInterfaceBase)itemContainer;
+            CRenameItemClass itemClass = itemInterface as CRenameItemClass;
+            if (itemClass != null)
             {
-                CRenameItemInterfaceBase itemInterface = (CRenameItemInterfaceBase)itemContainer;
-                CRenameItemClass itemClass = itemInterface as CRenameItemClass;
-                if (itemClass != null)
-                {
-                    if (!TraverseItems(itemClass.Classes, callBack) ||
-                        !TraverseItems(itemClass.Interfaces, callBack) ||
-                        !TraverseItems(itemClass.Enums, callBack) ||
-                        !TraverseItems(itemClass.Structs, callBack) ||
-                        !TraverseItems(itemClass.Variables, callBack) ||
-                        !TraverseItems(itemClass.Delegates, callBack))
-                        return false;
-                }
-                if (!TraverseItems(itemInterface.Properties, callBack) ||
-                    !TraverseItems(itemInterface.Methods, callBack))
+                if (!TraverseItemList(itemClass.Classes, callBack) ||
+                    !TraverseItemList(itemClass.Interfaces, callBack) ||
+                    !TraverseItemList(itemClass.Events, callBack) ||
+                    !TraverseItemList(itemClass.Variables, callBack) ||
+                    !TraverseItemList(itemClass.Types, callBack))
                     return false;
             }
-            return true;
+            return TraverseItemList(itemInterface.Properties, callBack) &&
+                   TraverseItemList(itemInterface.Methods, callBack);
         }
 
-        private bool TraverseItems<T>(IEnumerable<T> list, HandleItem callBack) where T : CRenameItem
+        private bool TraverseItemContainer(CRenameItemNamespace itemNamespace, HandleItem callBack)
+        {
+            return TraverseItemList(itemNamespace.Classes, callBack) &&
+                   TraverseItemList(itemNamespace.Interfaces, callBack) &&
+                   TraverseItemList(itemNamespace.Types, callBack) &&
+                   TraverseItemList(itemNamespace.Namespaces, callBack);
+        }
+
+        private bool TraverseItemList<T>(IEnumerable<T> list, HandleItem callBack) where T : CRenameItem
         {
             foreach (T item in list)
             {
                 if (!callBack(item))
                     return false;
-                IRenameItemContainer container = item as IRenameItemContainer;
-                if (container != null && !TraverseItems(container, callBack))
-                    return false;
+                CRenameItemNamespace itemNs = item as CRenameItemNamespace;
+                if (itemNs != null)
+                {
+                    if (!TraverseItemContainer(itemNs, callBack))
+                        return false;
+                }
+                else
+                {
+                    IRenameItemContainer container = item as IRenameItemContainer;
+                    if (container != null && !TraverseItemContainer(container, callBack))
+                        return false;
+                }
             }
             return true;
         }
+        #endregion
 
         public static void Message(string msg)
         {
@@ -624,42 +678,44 @@ namespace NamingFix
             _OutputWindow.OutputString(msg + "\r\n");
         }
 
-        private class CTypeResolver
+        private static class CTypeResolver
         {
-            private Dictionary<string, Type> _Alias;
+            private static List<string> _Alias;
 
-            public void AddTypes()
+            public static void AddTypes()
             {
-                _Alias = new Dictionary<string, Type>
+                if (_Alias != null)
+                    return;
+                _Alias = new List<string>
                     {
-                        {"bool", typeof(bool)},
-                        {"byte", typeof(byte)},
-                        {"sbyte", typeof(sbyte)},
-                        {"char", typeof(char)},
-                        {"decimal", typeof(decimal)},
-                        {"double", typeof(double)},
-                        {"float", typeof(float)},
-                        {"int", typeof(int)},
-                        {"uint", typeof(uint)},
-                        {"long", typeof(long)},
-                        {"ulong", typeof(ulong)},
-                        {"object", typeof(object)},
-                        {"short", typeof(short)},
-                        {"ushort", typeof(ushort)},
-                        {"string", typeof(string)}
+                        "bool",
+                        "byte",
+                        "sbyte",
+                        "char",
+                        "decimal",
+                        "double",
+                        "float",
+                        "int",
+                        "uint",
+                        "long",
+                        "ulong",
+                        "object",
+                        "short",
+                        "ushort",
+                        "string"
                     };
 
                 Assembly[] assemblies = AppDomain.CurrentDomain.GetAssemblies();
-                _WorkStatus.SubMax += assemblies.Length * 201;
+                _WorkStatus.SubMax += assemblies.Length * 251;
                 foreach (Assembly a in assemblies)
                 {
                     try
                     {
                         Type[] types = a.GetTypes();
-                        _WorkStatus.SubMax += types.Length - 200;
-                        foreach (var type in types)
+                        _WorkStatus.SubMax += types.Length - 250;
+                        foreach (Type type in types)
                         {
-                            _Alias[type.Name] = type;
+                            _Alias.Add(type.Name);
                             _WorkStatus.SubValue++;
                         }
                     }
@@ -668,12 +724,12 @@ namespace NamingFix
                 }
             }
 
-            public bool IsType(string typeName)
+            public static bool IsType(string typeName)
             {
                 if (_Alias == null)
                     AddTypes();
                 // ReSharper disable PossibleNullReferenceException
-                return _Alias.ContainsKey(typeName);
+                return _Alias.Contains(typeName);
                 // ReSharper restore PossibleNullReferenceException
             }
         }

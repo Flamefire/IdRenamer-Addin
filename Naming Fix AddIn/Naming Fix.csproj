@@ -118,17 +118,25 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="CNamingFix.cs" />
-    <Compile Include="CRenameItemLocVar.cs" />
+    <Compile Include="CRenameItemLocalVariable.cs" />
     <Compile Include="CRenameItemMethod.cs" />
     <Compile Include="CRenameItem.cs" />
     <Compile Include="CRenameItemClass.cs" />
     <Compile Include="CRenameItemInterface.cs" />
+    <Compile Include="CRenameItemNamespace.cs" />
     <Compile Include="CRenameRuleSet.cs" />
-    <Compile Include="Form1.cs">
+    <Compile Include="CUtils.cs" />
+    <Compile Include="CFormStatus.cs">
       <SubType>Form</SubType>
     </Compile>
-    <Compile Include="Form1.Designer.cs">
-      <DependentUpon>Form1.cs</DependentUpon>
+    <Compile Include="CFormStatus.Designer.cs">
+      <DependentUpon>CFormStatus.cs</DependentUpon>
+    </Compile>
+    <Compile Include="CFormConflicts.cs">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="CFormConflicts.Designer.cs">
+      <DependentUpon>CFormConflicts.cs</DependentUpon>
     </Compile>
     <Compile Include="Guids.cs" />
     <Compile Include="Resources.Designer.cs">
@@ -142,8 +150,11 @@
     <Compile Include="PkgCmdID.cs" />
   </ItemGroup>
   <ItemGroup>
-    <EmbeddedResource Include="Form1.resx">
-      <DependentUpon>Form1.cs</DependentUpon>
+    <EmbeddedResource Include="CFormStatus.resx">
+      <DependentUpon>CFormStatus.cs</DependentUpon>
+    </EmbeddedResource>
+    <EmbeddedResource Include="CFormConflicts.resx">
+      <DependentUpon>CFormConflicts.cs</DependentUpon>
     </EmbeddedResource>
     <EmbeddedResource Include="Resources.resx">
       <Generator>ResXFileCodeGenerator</Generator>

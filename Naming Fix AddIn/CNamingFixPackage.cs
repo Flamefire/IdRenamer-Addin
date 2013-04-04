@@ -17,11 +17,11 @@
 //  */
 #endregion
 
-using System.Runtime.InteropServices;
-using System.ComponentModel.Design;
 using EnvDTE;
 using EnvDTE80;
 using Microsoft.VisualStudio.Shell;
+using System.ComponentModel.Design;
+using System.Runtime.InteropServices;
 
 namespace NamingFix
 {
@@ -37,7 +37,7 @@ namespace NamingFix
     // This attribute tells the PkgDef creation utility (CreatePkgDef.exe) that this class is
     // a package.
     [PackageRegistration(UseManagedResourcesOnly = true), InstalledProductRegistration("#110", "#112", "1.0", IconResourceID = 400), ProvideMenuResource("Menus.ctmenu", 1),
-     Guid(GuidList.GuidNamingFixPkgString)]
+     Guid(CGuidList.GuidNamingFixPkgString)]
     // This attribute is used to register the information needed to show this package
     // in the Help/About dialog of Visual Studio.
     // This attribute is needed to let the shell know that this package exposes some menus.
@@ -67,7 +67,7 @@ namespace NamingFix
             if (null == mcs)
                 return;
             // Create the command for the menu item.
-            CommandID menuCommandId = new CommandID(GuidList.GuidNamingFixCmdSet, (int)PkgCmdIDList.cmdApplyNameScheme);
+            CommandID menuCommandId = new CommandID(CGuidList.GuidNamingFixCmdSet, (int)CPkgCmdIdList.cmdApplyNameScheme);
             MenuCommand menuItem = new MenuCommand(_NamingFix.MenuItemCallback, menuCommandId);
             mcs.AddCommand(menuItem);
         }

@@ -1,9 +1,28 @@
-﻿using System.Text.RegularExpressions;
+﻿#region license
+// /*
+//     This file is part of Naming Fix AddIn.
+// 
+//     Naming Fix AddIn is free software: you can redistribute it and/or modify
+//     it under the terms of the GNU General Public License as published by
+//     the Free Software Foundation, either version 3 of the License, or
+//     (at your option) any later version.
+// 
+//     Naming Fix AddIn is distributed in the hope that it will be useful,
+//     but WITHOUT ANY WARRANTY; without even the implied warranty of
+//     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+//     GNU General Public License for more details.
+// 
+//     You should have received a copy of the GNU General Public License
+//     along with Naming Fix AddIn. If not, see <http://www.gnu.org/licenses/>.
+//  */
+#endregion
+
 using EnvDTE;
+using System.Text.RegularExpressions;
 
 namespace NamingFix
 {
-    class CRenameItemLocVar : CRenameItem
+    class CRenameItemLocalVariable : CRenameItem
     {
         public bool IsConst;
         public new CRenameItemMethod Parent
@@ -18,10 +37,6 @@ namespace NamingFix
         public override TextPoint StartPoint
         {
             get { return Parent.StartPoint; }
-        }
-        public override TextPoint EndPoint
-        {
-            get { return Parent.EndPoint; }
         }
 
         public override void Rename()

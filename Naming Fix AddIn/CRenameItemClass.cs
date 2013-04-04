@@ -17,8 +17,9 @@
 //  */
 #endregion
 
-using System;
 using EnvDTE80;
+using System;
+using System.Linq;
 
 namespace NamingFix
 {
@@ -29,9 +30,7 @@ namespace NamingFix
     {
         public readonly CRenameItemList<CRenameItemClass> Classes = new CRenameItemList<CRenameItemClass>();
         public readonly CRenameItemList<CRenameItemInterface> Interfaces = new CRenameItemList<CRenameItemInterface>();
-        public readonly CRenameItemList<CRenameItemStruct> Structs = new CRenameItemList<CRenameItemStruct>();
-        public readonly CRenameItemList<CRenameItemEnum> Enums = new CRenameItemList<CRenameItemEnum>();
-        public readonly CRenameItemList<CRenameItemDelegate> Delegates = new CRenameItemList<CRenameItemDelegate>();
+        public readonly CRenameItemList<CRenameItemType> Types = new CRenameItemList<CRenameItemType>();
         public readonly CRenameItemList<CRenameItemVariable> Variables = new CRenameItemList<CRenameItemVariable>();
 
         public override bool IsSystem
@@ -41,9 +40,7 @@ namespace NamingFix
                 base.IsSystem = value;
                 Classes.ForEach(item => item.IsSystem = value);
                 Interfaces.ForEach(item => item.IsSystem = value);
-                Structs.ForEach(item => item.IsSystem = value);
-                Enums.ForEach(item => item.IsSystem = value);
-                Delegates.ForEach(item => item.IsSystem = value);
+                Types.ForEach(item => item.IsSystem = value);
                 Variables.ForEach(item => item.IsSystem = value);
             }
         }
@@ -54,12 +51,8 @@ namespace NamingFix
                 Classes.Add(item);
             else if (item is CRenameItemInterface)
                 Interfaces.Add(item);
-            else if (item is CRenameItemEnum)
-                Enums.Add(item);
-            else if (item is CRenameItemStruct)
-                Structs.Add(item);
-            else if (item is CRenameItemDelegate)
-                Delegates.Add(item);
+            else if (item is CRenameItemType)
+                Types.Add(item);
             else if (item is CRenameItemVariable)
                 Variables.Add(item);
             else
@@ -68,13 +61,16 @@ namespace NamingFix
             item.IsSystem = IsSystem;
         }
 
+        public override bool IsConflictLocVar(string newName, string oldName)
+        {
+            return Methods.Any(method => method.IsConflictLocVar(newName, oldName));
+        }
+
         public override bool IsConflictType(string newName, string oldName)
         {
             return Classes.IsConflict(newName, oldName) ||
                    Interfaces.IsConflict(newName, oldName) ||
-                   Structs.IsConflict(newName, oldName) ||
-                   Enums.IsConflict(newName, oldName) ||
-                   Delegates.IsConflict(newName, oldName) ||
+                   Types.IsConflict(newName, oldName) ||
                    base.IsConflictType(newName, oldName);
         }
 
@@ -93,15 +89,13 @@ namespace NamingFix
             Variables.AddRange(otherItem2.Variables);
             Classes.AddRange(otherItem2.Classes);
             Interfaces.AddRange(otherItem2.Interfaces);
-            Enums.AddRange(otherItem2.Enums);
-            Structs.AddRange(otherItem2.Structs);
-            Delegates.AddRange(otherItem2.Delegates);
+            Types.AddRange(otherItem2.Types);
         }
 
-        protected override CRenameItem FindTypeNameDown(String typeName)
+        public CRenameItem FindTypeNameDown(String typeName)
         {
             string mainType, subType;
-            SplitTypeName(typeName, out mainType, out subType);
+            CUtils.SplitTypeName(typeName, out mainType, out subType);
 
             CRenameItemClass cClass = Classes.Find(mainType);
             if (subType != "")
@@ -113,19 +107,16 @@ namespace NamingFix
                 return cClass;
 
             CRenameItem result = Interfaces.Find(mainType);
-            if (result != null)
-                return result;
-            result = Structs.Find(mainType);
-            if (result != null)
-                return result;
-            result = Enums.Find(mainType);
-            if (result != null)
-                return result;
-            result = Delegates.Find(mainType);
-
-            return result;
+            return result ?? Types.Find(mainType);
         }
 
+        public override CRenameItem FindTypeByName(string typeName)
+        {
+            CRenameItem result = FindTypeNameDown(typeName);
+            if (result != null)
+                return result;
+            return base.FindTypeByName(typeName);
+        }
     }
 
     class CRenameItemClass : CRenameItemClassBase

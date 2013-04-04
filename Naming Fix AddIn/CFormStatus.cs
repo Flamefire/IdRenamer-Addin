@@ -17,10 +17,16 @@
 //  */
 #endregion
 
+using System.Windows.Forms;
+
 namespace NamingFix
 {
-    static class CPkgCmdIdList
+    public partial class CFormStatus : Form
     {
-        public const uint cmdApplyNameScheme = 0x100;
-    };
+        public CFormStatus()
+        {
+            InitializeComponent();
+            Visible = false;
+        }
+    }
 }

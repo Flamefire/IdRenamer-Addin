@@ -17,10 +17,10 @@
 //  */
 #endregion
 
-using System.Collections.Generic;
-using System.Linq;
 using EnvDTE;
 using EnvDTE80;
+using System.Collections.Generic;
+using System.Linq;
 
 namespace NamingFix
 {
@@ -41,7 +41,6 @@ namespace NamingFix
         public IRenameItemContainer Parent { get; set; }
         public abstract ProjectItem ProjectItem { get; }
         public abstract TextPoint StartPoint { get; }
-        public abstract TextPoint EndPoint { get; }
 
         public abstract void Rename();
         public abstract bool IsRenameValid();
@@ -50,17 +49,24 @@ namespace NamingFix
         {
             return GetType().Name.Substring("CRenameItem".Length);
         }
+
+        public void Show()
+        {
+            if (ProjectItem.Document == null || ProjectItem.Document.Windows.Count == 0)
+                ProjectItem.Open(Constants.vsViewKindCode);
+            StartPoint.TryToShow(vsPaneShowHow.vsPaneShowTop);
+        }
     }
 
     abstract class CRenameItemElement : CRenameItem
     {
-        private CodeElement _Element;
-        public CodeElement Element
+        protected CodeElement _InternalElement;
+        public virtual CodeElement Element
         {
-            private get { return _Element; }
+            private get { return _InternalElement; }
             set
             {
-                _Element = value;
+                _InternalElement = value;
                 Name = value.Name;
             }
         }
@@ -72,15 +78,11 @@ namespace NamingFix
 
         public override ProjectItem ProjectItem
         {
-            get { return _Element.ProjectItem; }
+            get { return _InternalElement.ProjectItem; }
         }
         public override TextPoint StartPoint
         {
-            get { return _Element.StartPoint; }
-        }
-        public override TextPoint EndPoint
-        {
-            get { return _Element.EndPoint; }
+            get { return _InternalElement.StartPoint; }
         }
 
         public override void Rename()
@@ -114,6 +116,11 @@ namespace NamingFix
         ///     Checks if given Id collides with Id(Property, Variable, Function)
         /// </summary>
         bool IsConflictId(string newName, string oldName);
+
+        /// <summary>
+        ///     Finds given typename, which is valid in context of current class
+        /// </summary>
+        CRenameItem FindTypeByName(string typeName);
     }
 
     class CRenameItemList<T> : List<T> where T : CRenameItem
@@ -172,7 +179,7 @@ namespace NamingFix
         }
     }
 
-    class CRenameItemEvent : CRenameItemType
+    class CRenameItemEvent : CRenameItemVariableBase
     {
         public CodeEvent GetElement()
         {

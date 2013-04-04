@@ -1,6 +1,6 @@
 ﻿namespace NamingFix
 {
-    partial class Form1
+    partial class CFormStatus
     {
         /// <summary>
         /// Required designer variable.
@@ -92,7 +92,7 @@
             this.pbSub.UseWaitCursor = true;
             this.pbSub.Value = 50;
             // 
-            // Form1
+            // CFormStatus
             // 
             this.AutoScaleDimensions = new System.Drawing.SizeF(6F, 13F);
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
@@ -104,7 +104,7 @@
             this.Controls.Add(this.pbMain);
             this.Controls.Add(this.lblText);
             this.FormBorderStyle = System.Windows.Forms.FormBorderStyle.FixedDialog;
-            this.Name = "Form1";
+            this.Name = "CFormStatus";
             this.ShowIcon = false;
             this.ShowInTaskbar = false;
             this.StartPosition = System.Windows.Forms.FormStartPosition.CenterScreen;

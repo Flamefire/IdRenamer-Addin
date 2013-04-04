@@ -17,19 +17,19 @@
 //  */
 #endregion
 
+using EnvDTE;
+using EnvDTE80;
 using System;
 using System.Collections.Generic;
 using System.Text.RegularExpressions;
-using EnvDTE;
-using EnvDTE80;
 
 namespace NamingFix
 {
     class CRenameItemMethod : CRenameItemElement, IRenameItemContainer
     {
         public readonly CRenameItemList<CRenameItemParameter> Parameters = new CRenameItemList<CRenameItemParameter>();
-        private CRenameItemList<CRenameItemLocVar> _LocalVars;
-        public CRenameItemList<CRenameItemLocVar> LocalVars
+        private CRenameItemList<CRenameItemLocalVariable> _LocalVars;
+        public CRenameItemList<CRenameItemLocalVariable> LocalVars
         {
             get
             {
@@ -43,7 +43,7 @@ namespace NamingFix
         private readonly List<string> _Strings = new List<string>();
         private readonly List<string> _Comments = new List<string>();
         private const string _Id = "@?[a-z_][a-z0-9_\\.]*";
-        private static readonly Regex _ReLocVar = new Regex(@"(?<=[\{\(,;]\s*)((const\s+)?" + _Id + "(<" + _Id + @">)?)\s*(\[\])?\s+(" + _Id + @")(?=\s*([=,;]|( in )))",
+        private static readonly Regex _ReLocVar = new Regex(@"(?<=[\{\(,;]\s*)((const\s+)?(" + _Id + ")(<" + _Id + @">)?)\s*(\[\])?\s+(" + _Id + @")(?=\s*([=,;]|( in )))",
                                                             RegexOptions.Compiled | RegexOptions.IgnoreCase | RegexOptions.Singleline);
         private static readonly Regex _ReString = new Regex(@"""(\\.|[^\\""])*""", RegexOptions.Compiled | RegexOptions.Singleline);
         private static readonly Regex _ReVarbatimString = new Regex("@\"(\"\"|[^\"])*\"", RegexOptions.Compiled | RegexOptions.Multiline);
@@ -81,7 +81,7 @@ namespace NamingFix
         public void ReloadText()
         {
             CodeFunction2 func = GetElement();
-            if (IsSystem)
+            if (IsSystem || func.MustImplement)
                 _Text = "";
             else
             {
@@ -109,23 +109,22 @@ namespace NamingFix
 
         private void GetLocalVars()
         {
-            _LocalVars = new CRenameItemList<CRenameItemLocVar>();
+            _LocalVars = new CRenameItemList<CRenameItemLocalVariable>();
             MatchCollection locVars = _ReLocVar.Matches(Text);
             if (locVars.Count <= 0)
                 return;
-            CNamingFix.Message("Method " + GetElement().Name + ":");
+            CNamingFix.Message("Method " + Name + ":");
             //First capture all vars, rename, check for 2 vars with same name and possible colliding space
             foreach (Match match in locVars)
             {
-                string type = match.Groups[1].Value.ToLower();
-                string name = match.Groups[5].Value;
+                string type = match.Groups[3].Value;
+                string name = match.Groups[6].Value;
                 if (type == "return" || type == "else" || type == "in" || type == "out" || type == "ref")
                     continue;
-                type = match.Groups[1].Value;
                 if (((CRenameItemInterfaceBase)Parent).FindTypeByName(type) == null && !CNamingFix.FoundTypes.Contains(type))
                     CNamingFix.FoundTypes.Add(type);
                 CNamingFix.Message(name + "\t(" + type + ")");
-                CRenameItemLocVar item = new CRenameItemLocVar {Name = name, Parent = this, IsConst = match.Groups[2].Value != ""};
+                CRenameItemLocalVariable item = new CRenameItemLocalVariable {Name = name, Parent = this, IsConst = match.Groups[2].Value != ""};
                 Add(item);
             }
         }
@@ -168,7 +167,7 @@ namespace NamingFix
         {
             if (item is CRenameItemParameter)
                 Parameters.Add(item);
-            else if (item is CRenameItemLocVar)
+            else if (item is CRenameItemLocalVariable)
                 LocalVars.Add(item);
             else
                 throw new ArgumentException();
@@ -196,6 +195,12 @@ namespace NamingFix
             return (Name == NewName) ||
                    (!Parent.IsConflictLocVar(NewName, Name) &&
                     !Parent.IsConflictId(NewName, Name));
+        }
+
+        public CRenameItem FindTypeByName(string typeName)
+        {
+            //No types in methods
+            return Parent.FindTypeByName(typeName);
         }
     }
 }

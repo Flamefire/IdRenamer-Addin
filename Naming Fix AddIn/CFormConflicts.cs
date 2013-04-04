@@ -17,10 +17,24 @@
 //  */
 #endregion
 
+using System;
+using System.Windows.Forms;
+
 namespace NamingFix
 {
-    static class CPkgCmdIdList
+    public partial class CFormConflicts : Form
     {
-        public const uint cmdApplyNameScheme = 0x100;
-    };
+        public CFormConflicts()
+        {
+            InitializeComponent();
+        }
+
+        private void listBox1_Click(object sender, EventArgs e)
+        {
+            int sel = lbConflicts.SelectedIndex;
+            if (sel < 0)
+                return;
+            CNamingFix.Conflicts[sel].Show();
+        }
+    }
 }

@@ -8,10 +8,10 @@
 // </auto-generated>
 //------------------------------------------------------------------------------
 
-namespace NamingFix {
-    using System;
-    
-    
+namespace NamingFix
+{
+
+
     /// <summary>
     ///   Eine stark typisierte Ressourcenklasse zum Suchen von lokalisierten Zeichenfolgen usw.
     /// </summary>

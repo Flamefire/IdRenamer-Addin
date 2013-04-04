@@ -17,10 +17,25 @@
 //  */
 #endregion
 
+using System;
+
 namespace NamingFix
 {
-    static class CPkgCmdIdList
+    static class CUtils
     {
-        public const uint cmdApplyNameScheme = 0x100;
-    };
+        public static void SplitTypeName(string className, out string topClass, out String subClass)
+        {
+            int p = className.IndexOf('.');
+            if (p >= 0)
+            {
+                topClass = className.Substring(0, p);
+                subClass = className.Substring(p + 1);
+            }
+            else
+            {
+                topClass = className;
+                subClass = "";
+            }
+        }
+    }
 }

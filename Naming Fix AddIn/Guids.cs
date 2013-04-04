@@ -21,10 +21,10 @@ using System;
 
 namespace NamingFix
 {
-    static class GuidList
+    static class CGuidList
     {
         public const string GuidNamingFixPkgString = "3d0ba8c5-842a-4c4c-9fb7-b2b562f18e7e";
-        public const string GuidNamingFixCmdSetString = "508848dc-e39b-43ee-afc7-8500b661824a";
+        private const string GuidNamingFixCmdSetString = "508848dc-e39b-43ee-afc7-8500b661824a";
 
         public static readonly Guid GuidNamingFixCmdSet = new Guid(GuidNamingFixCmdSetString);
     };

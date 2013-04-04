@@ -17,10 +17,8 @@
 //  */
 #endregion
 
-using System.Collections.Generic;
-using System.Linq;
-using System;
 using EnvDTE80;
+using System;
 
 namespace NamingFix
 {
@@ -29,7 +27,6 @@ namespace NamingFix
         public readonly CRenameItemList<CRenameItemMethod> Methods = new CRenameItemList<CRenameItemMethod>();
         public readonly CRenameItemList<CRenameItemProperty> Properties = new CRenameItemList<CRenameItemProperty>();
         public readonly CRenameItemList<CRenameItemEvent> Events = new CRenameItemList<CRenameItemEvent>();
-        public bool IsTopClass;
         public bool IsInheritedLoaded;
 
         public override bool IsSystem
@@ -58,19 +55,20 @@ namespace NamingFix
 
         public virtual bool IsConflictLocVar(string newName, string oldName)
         {
-            return Methods.Any(method => method.IsConflictLocVar(newName, oldName));
+            //No local vars in interfaces
+            return false;
         }
 
         public virtual bool IsConflictType(string newName, string oldName)
         {
-            return Events.IsConflict(newName, oldName) ||
-                   Parent != null && Parent.IsConflictType(newName, oldName);
+            return Parent != null && Parent.IsConflictType(newName, oldName);
         }
 
         public virtual bool IsConflictId(string newName, string oldName)
         {
             return Properties.IsConflict(newName, oldName) ||
                    Methods.IsConflict(newName, oldName) ||
+                   Events.IsConflict(newName, oldName) ||
                    (Parent != null && Parent.IsConflictId(newName, oldName));
         }
 
@@ -85,37 +83,9 @@ namespace NamingFix
             throw new ArgumentException("Cannot copy derived IDs of base type");
         }
 
-        protected static void SplitTypeName(string className, out string topClass, out String subClass)
-        {
-            int p = className.IndexOf('.');
-            topClass = (p >= 0) ? className.Substring(0, p) : className;
-            subClass = (p >= 0) ? className.Substring(p + 1) : "";
-        }
-
-        protected virtual CRenameItem FindTypeNameDown(String typeName)
-        {
-            return null;
-        }
-
         public virtual CRenameItem FindTypeByName(string typeName)
         {
-            //Strip redundant own typename
-            //This is only valid where the id has been defined so do it here
-            string mainType, subType;
-            SplitTypeName(typeName, out mainType, out subType);
-            if (mainType == Name)
-            {
-                if (subType == "")
-                    return this;
-                typeName = subType;
-            }
-            CRenameItem result = FindTypeNameDown(typeName);
-            if (result != null)
-                return result;
-            if (Parent != null)
-                return ((CRenameItemClass)Parent).FindTypeByName(typeName);
-            //Assume we have a namespace and we are in top class
-            return (subType == "" || !IsTopClass) ? null : FindTypeByName(subType);
+            return Parent != null ? Parent.FindTypeByName(typeName) : null;
         }
     }
 
