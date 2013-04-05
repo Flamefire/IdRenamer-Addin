@@ -64,7 +64,7 @@ namespace NamingFix
             try
             {
                 //Fügen Sie der Befehlsauflistung einen Befehl hinzu:
-                Command command = commands.AddNamedCommand2(_AddInInstance, _ExecCmdName, "Apply namesheme", "Starts the analysis", true, 59, ref contextGuids);
+                Command command = commands.AddNamedCommand2(_AddInInstance, _ExecCmdName, "Apply namesheme", "Starts the analysis", true, 0940, ref contextGuids);
 
                 //Fügen Sie dem Menü "Tools" ein Steuerelement für den Befehl hinzu:
                 if ((command != null) && (toolsPopup != null))
