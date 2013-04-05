@@ -72,15 +72,15 @@ namespace NamingFix
             get { return (_ExplicitInterfaceName != "") ? vsCMAccess.vsCMAccessPublic : GetElement().Access; }
         }
 
-        public override void Rename()
+        public override bool Rename()
         {
             if (_ExplicitInterfaceName != "")
             {
                 if (NewName == Name)
-                    return;
+                    return true;
                 NewName = _ExplicitInterfaceName + "." + NewName;
             }
-            base.Rename();
+            return base.Rename();
         }
 
         private bool IsExtern()

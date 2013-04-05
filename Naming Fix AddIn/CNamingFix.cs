@@ -674,6 +674,16 @@ namespace NamingFix
         #endregion
 
         #region ApplyChanges
+        private static void ShowNotRenamed(CRenameItem item)
+        {
+            string name = item.Name;
+            if (item.Parent.Name != "")
+                name = item.Parent.Name + "." + name;
+            if (((CRenameItem)item.Parent).Parent != null && ((CRenameItem)item.Parent).Parent.Name != "")
+                name = ((CRenameItem)item.Parent).Parent.Name + "." + name;
+            Message("Did not rename " + name);
+        }
+
         private static bool ApplyChangesPre(CRenameItem item)
         {
             _WorkStatus.SubValue++;
@@ -682,9 +692,14 @@ namespace NamingFix
                 if (item.Name != item.NewName)
                 {
                     _WorkStatus.Text = "Applying changes: " + item.Name;
-                    if (item.GetConflictItem(true) != null)
-                        item.NewName = _TmpPrefix + item.NewName;
-                    item.Rename();
+                    if (item.GetConflictItem(false) == null)
+                    {
+                        if (item.GetConflictItem(true) != null)
+                            item.NewName = _TmpPrefix + item.NewName;
+                        if (item.Rename())
+                            return true;
+                    }
+                    ShowNotRenamed(item);
                 }
             }
             return true;
@@ -700,8 +715,14 @@ namespace NamingFix
                 //Avoid conflicts by using temporary names
                 foreach (CRenameItemLocalVariable localVar in method.LocalVars.Where(localVar => localVar.Name != localVar.NewName))
                 {
-                    localVar.NewName = _TmpPrefix + localVar.NewName;
-                    localVar.Rename();
+                    if (localVar.GetConflictItem(false) != null)
+                        ShowNotRenamed(localVar);
+                    else
+                    {
+                        localVar.NewName = _TmpPrefix + localVar.NewName;
+                        localVar.Rename();
+
+                    }
                 }
                 foreach (CRenameItemLocalVariable localVar in method.LocalVars.Where(localVar => localVar.Name.StartsWith(_TmpPrefix)))
                 {
@@ -720,8 +741,13 @@ namespace NamingFix
             {
                 if (item.Name.StartsWith(_TmpPrefix))
                 {
-                    item.NewName = item.Name.Substring(_TmpPrefix.Length);
-                    item.Rename();
+                    if (item.GetConflictItem(false) != null)
+                        ShowNotRenamed(item);
+                    else
+                    {
+                        item.NewName = item.Name.Substring(_TmpPrefix.Length);
+                        item.Rename();
+                    }
                 }
             }
             return true;

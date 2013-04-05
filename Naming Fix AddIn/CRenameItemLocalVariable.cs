@@ -39,15 +39,16 @@ namespace NamingFix
             get { return Parent.StartPoint; }
         }
 
-        public override void Rename()
+        public override bool Rename()
         {
             if (Name == NewName)
-                return;
+                return true;
             CRenameItemMethod parent = Parent;
             string nameRe = Regex.Escape(Name);
             if (nameRe[0] == '@')
                 nameRe = "@?" + nameRe.Substring(1);
             parent.Text = Regex.Replace(parent.Text, @"(?<! new )(?<!\w|\.)" + nameRe + @"(?=( in )|\b(?!\s+[a-zA-Z_]))", NewName, RegexOptions.Singleline);
+            return true;
         }
 
         public override CRenameItem GetConflictItem(bool swapCheck)

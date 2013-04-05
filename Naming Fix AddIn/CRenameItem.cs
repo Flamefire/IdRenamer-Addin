@@ -17,6 +17,7 @@
 //  */
 #endregion
 
+using System.Runtime.InteropServices;
 using EnvDTE;
 using EnvDTE80;
 using System.Collections.Generic;
@@ -43,7 +44,7 @@ namespace NamingFix
         public abstract ProjectItem ProjectItem { get; }
         public abstract TextPoint StartPoint { get; }
 
-        public abstract void Rename();
+        public abstract bool Rename();
         private static readonly Regex _ReCaps = new Regex("(?<=[a-z])[A-Z]", RegexOptions.Compiled);
 
         /// <summary>
@@ -100,14 +101,38 @@ namespace NamingFix
             get { return InternalElement.StartPoint; }
         }
 
-        public override void Rename()
+        public override bool Rename()
         {
             if (NewName == Name)
-                return;
-            CodeElement2 element2 = Element as CodeElement2;
-            if (element2 != null)
-                element2.RenameSymbol(NewName);
-            Name = NewName;
+                return true;
+            try
+            {
+                if (Element.Name == NewName)
+                {
+                    Name = NewName;
+                    return true;
+                }
+            }
+            catch (COMException)
+            {
+                //assume the element has already been changed
+                Name = NewName;
+                return true;
+            }
+            try
+            {
+                CodeElement2 element2 = Element as CodeElement2;
+                if (element2 != null)
+                    element2.RenameSymbol(NewName);
+                Name = NewName;
+                return true;
+            }
+            catch (COMException)
+            {
+                //User aborted renaming
+                NewName = Name;
+                return false;
+            }
         }
     }
 
