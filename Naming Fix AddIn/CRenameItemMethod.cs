@@ -104,7 +104,7 @@ namespace NamingFix
         {
             String text = Text;
             RestoreTextComments(ref text);
-            _StartPt.ReplaceText(_EndPt, text, (int)vsEPReplaceTextOptions.vsEPReplaceTextKeepMarkers);
+            _StartPt.ReplaceText(_EndPt, text.Substring(1), (int)vsEPReplaceTextOptions.vsEPReplaceTextKeepMarkers);
         }
 
         private void GetLocalVars()

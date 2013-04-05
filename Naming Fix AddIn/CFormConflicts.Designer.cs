@@ -43,7 +43,7 @@
             this.lbConflicts.Name = "lbConflicts";
             this.lbConflicts.Size = new System.Drawing.Size(280, 524);
             this.lbConflicts.TabIndex = 0;
-            this.lbConflicts.Click += new System.EventHandler(this.listBox1_Click);
+            this.lbConflicts.Click += new System.EventHandler(this.LbConflictsClick);
             // 
             // label1
             // 

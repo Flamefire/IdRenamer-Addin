@@ -32,7 +32,7 @@ namespace NamingFix
 
         public override CodeElement Element
         {
-            set { _InternalElement = value; }
+            set { InternalElement = value; }
         }
 
         public override bool IsSystem

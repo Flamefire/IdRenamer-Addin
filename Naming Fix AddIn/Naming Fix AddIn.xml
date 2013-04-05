@@ -1,0 +1,122 @@
+<?xml version="1.0"?>
+<doc>
+    <assembly>
+        <name>Naming Fix</name>
+    </assembly>
+    <members>
+        <member name="F:NamingFix.CFormStatus.components">
+            <summary>
+            Required designer variable.
+            </summary>
+        </member>
+        <member name="M:NamingFix.CFormStatus.Dispose(System.Boolean)">
+            <summary>
+            Clean up any resources being used.
+            </summary>
+            <param name="disposing">true if managed resources should be disposed; otherwise, false.</param>
+        </member>
+        <member name="M:NamingFix.CFormStatus.InitializeComponent">
+            <summary>
+            Required method for Designer support - do not modify
+            the contents of this method with the code editor.
+            </summary>
+        </member>
+        <member name="F:NamingFix.CFormConflicts.components">
+            <summary>
+            Required designer variable.
+            </summary>
+        </member>
+        <member name="M:NamingFix.CFormConflicts.Dispose(System.Boolean)">
+            <summary>
+            Clean up any resources being used.
+            </summary>
+            <param name="disposing">true if managed resources should be disposed; otherwise, false.</param>
+        </member>
+        <member name="M:NamingFix.CFormConflicts.InitializeComponent">
+            <summary>
+            Required method for Designer support - do not modify
+            the contents of this method with the code editor.
+            </summary>
+        </member>
+        <member name="T:NamingFix.CConnect">
+            <summary>Das Objekt für die Implementierung eines Add-Ins.</summary>
+            <seealso class='IDTExtensibility2' />
+        </member>
+        <member name="M:NamingFix.CConnect.OnConnection(System.Object,Extensibility.ext_ConnectMode,System.Object,System.Array@)">
+            <summary>Implementiert die OnConnection-Methode der IDTExtensibility2-Schnittstelle. Empfängt eine Benachrichtigung, wenn das Add-In geladen wird.</summary>
+            <param name="application">Stammobjekt der Hostanwendung.</param>
+            <param name="connectMode">Beschreibt, wie das Add-In geladen wird.</param>
+            <param name="addInInst">Objekt, das dieses Add-In darstellt.</param>
+            <param name="custom"></param>
+            <seealso class='IDTExtensibility2' />
+        </member>
+        <member name="M:NamingFix.CConnect.OnDisconnection(Extensibility.ext_DisconnectMode,System.Array@)">
+            <summary>Implementiert die OnDisconnection-Methode der IDTExtensibility2-Schnittstelle. Empfängt eine Benachrichtigung, wenn das Add-In entladen wird.</summary>
+            <param name='disconnectMode'>Beschreibt, wie das Add-In entladen wird.</param>
+            <param name='custom'>Array von spezifischen Parametern für die Hostanwendung.</param>
+            <seealso class='IDTExtensibility2' />
+        </member>
+        <member name="M:NamingFix.CConnect.OnAddInsUpdate(System.Array@)">
+            <summary>Implementiert die OnAddInsUpdate-Methode der IDTExtensibility2-Schnittstelle. Empfängt eine Benachrichtigung, wenn die Auflistung von Add-Ins geändert wurde.</summary>
+            <param name='custom'>Array von spezifischen Parametern für die Hostanwendung.</param>
+            <seealso class='IDTExtensibility2' />
+        </member>
+        <member name="M:NamingFix.CConnect.OnStartupComplete(System.Array@)">
+            <summary>Implementiert die OnStartupComplete-Methode der IDTExtensibility2-Schnittstelle. Empfängt eine Benachrichtigung, wenn der Ladevorgang der Hostanwendung abgeschlossen ist.</summary>
+            <param name='custom'>Array von spezifischen Parametern für die Hostanwendung.</param>
+            <seealso class='IDTExtensibility2' />
+        </member>
+        <member name="M:NamingFix.CConnect.OnBeginShutdown(System.Array@)">
+            <summary>Implementiert die OnBeginShutdown-Methode der IDTExtensibility2-Schnittstelle. Empfängt eine Benachrichtigung, wenn die Hostanwendung entladen wird.</summary>
+            <param name='custom'>Array von spezifischen Parametern für die Hostanwendung.</param>
+            <seealso class='IDTExtensibility2' />
+        </member>
+        <member name="M:NamingFix.CConnect.QueryStatus(System.String,EnvDTE.vsCommandStatusTextWanted,EnvDTE.vsCommandStatus@,System.Object@)">
+            <summary>Implementiert die QueryStatus-Methode der IDTCommandTarget-Schnittstelle. Diese wird aufgerufen, wenn die Verfügbarkeit des Befehls aktualisiert wird.</summary>
+            <param name='commandName'>Der Name des Befehls, dessen Zustand ermittelt werden soll.</param>
+            <param name='neededText'>Für den Befehl erforderlicher Text.</param>
+            <param name='status'>Der Zustand des Befehls in der Benutzeroberfläche.</param>
+            <param name='commandText'>Vom neededText-Parameter angeforderter Text.</param>
+            <seealso class='Exec' />
+        </member>
+        <member name="M:NamingFix.CConnect.Exec(System.String,EnvDTE.vsCommandExecOption,System.Object@,System.Object@,System.Boolean@)">
+            <summary>Implementiert die Exec-Methode der IDTCommandTarget-Schnittstelle. Diese wird aufgerufen, wenn der Befehl aufgerufen wird.</summary>
+            <param name='commandName'>Der Name des auszuführenden Befehls.</param>
+            <param name='executeOption'>Beschreibt, wie der Befehl ausgeführt werden muss.</param>
+            <param name='varIn'>Parameter, die vom Aufrufer an den Befehlshandler übergeben werden.</param>
+            <param name='varOut'>Parameter, die vom Befehlshandler an den Aufrufer übergeben werden.</param>
+            <param name='handled'>Informiert den Aufrufer, ob der Befehl bearbeitet wurde oder nicht.</param>
+            <seealso class='Exec' />
+        </member>
+        <member name="M:NamingFix.CNamingFix.DoFix">
+            <summary>
+                This function is used to execute a command when the a menu item is clicked.
+            </summary>
+        </member>
+        <member name="M:NamingFix.IRenameItemContainer.IsConflictLocVar(System.String,System.String)">
+            <summary>
+                Checks if given Id collides with local variable
+            </summary>
+        </member>
+        <member name="M:NamingFix.IRenameItemContainer.IsConflictType(System.String,System.String)">
+            <summary>
+                Checks if given Id collides with type
+            </summary>
+        </member>
+        <member name="M:NamingFix.IRenameItemContainer.IsConflictId(System.String,System.String)">
+            <summary>
+                Checks if given Id collides with Id(Property, Variable, Function)
+            </summary>
+        </member>
+        <member name="M:NamingFix.IRenameItemContainer.FindTypeByName(System.String)">
+            <summary>
+                Finds given typename, which is valid in context of current class
+            </summary>
+        </member>
+        <member name="T:NamingFix.CRenameItemClassBase">
+            <summary>
+                Do not set Parent to anything!
+            </summary>
+        </member>
+    </members>
+</doc>

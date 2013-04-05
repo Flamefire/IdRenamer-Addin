@@ -60,13 +60,13 @@ namespace NamingFix
 
     abstract class CRenameItemElement : CRenameItem
     {
-        protected CodeElement _InternalElement;
+        protected CodeElement InternalElement;
         public virtual CodeElement Element
         {
-            private get { return _InternalElement; }
+            private get { return InternalElement; }
             set
             {
-                _InternalElement = value;
+                InternalElement = value;
                 Name = value.Name;
             }
         }
@@ -78,11 +78,11 @@ namespace NamingFix
 
         public override ProjectItem ProjectItem
         {
-            get { return _InternalElement.ProjectItem; }
+            get { return InternalElement.ProjectItem; }
         }
         public override TextPoint StartPoint
         {
-            get { return _InternalElement.StartPoint; }
+            get { return InternalElement.StartPoint; }
         }
 
         public override void Rename()

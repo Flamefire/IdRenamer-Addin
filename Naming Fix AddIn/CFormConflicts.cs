@@ -29,12 +29,19 @@ namespace NamingFix
             InitializeComponent();
         }
 
-        private void listBox1_Click(object sender, EventArgs e)
+        private void LbConflictsClick(object sender, EventArgs e)
         {
             int sel = lbConflicts.SelectedIndex;
             if (sel < 0)
                 return;
-            CNamingFix.Conflicts[sel].Show();
+            try
+            {
+                CNamingFix.Conflicts[sel].Show();
+            }
+            catch
+            {
+                MessageBox.Show("Item not found. Maybe it has been deleted, renamed are moved!", "Cannot show item", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            }
         }
     }
 }

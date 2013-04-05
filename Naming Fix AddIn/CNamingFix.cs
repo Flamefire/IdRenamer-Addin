@@ -28,7 +28,7 @@ using System.Windows.Forms;
 
 namespace NamingFix
 {
-    class CNamingFix
+    class CNamingFix : IDisposable
     {
         private struct SWorkStatus
         {
@@ -61,7 +61,7 @@ namespace NamingFix
 
         public static readonly List<String> FoundTypes = new List<string>();
 
-        private readonly CFormStatus _StatusForm = new CFormStatus();
+        private readonly CFormStatus _FormStatus = new CFormStatus();
         private readonly CFormConflicts _FormConflicts = new CFormConflicts();
         public static readonly List<CRenameItem> Conflicts = new List<CRenameItem>();
         private static int _ElCount;
@@ -69,36 +69,49 @@ namespace NamingFix
         private System.Threading.Thread _WorkerThread;
         private static SWorkStatus _WorkStatus;
         private readonly Timer _UpdateTimer = new Timer();
+        private bool _IsDisposed;
 
         //Strings
         //comments
         public CNamingFix(DTE2 dte)
         {
             _Dte = dte;
-            Window window = _Dte.Windows.Item(Constants.vsWindowKindOutput);
-            OutputWindow outputWindow = (OutputWindow)window.Object;
-            _OutputWindow = outputWindow.OutputWindowPanes.Add("new pane");
-            _StatusForm.pbMain.Maximum = 5;
-            _UpdateTimer.Interval = 50;
+            _OutputWindow = GetPane("Naming Fix AddIn");
+            _FormStatus.pbMain.Maximum = 9;
+            _UpdateTimer.Interval = 80;
             _UpdateTimer.Tick += Timer_ShowStatus;
         }
 
+        private OutputWindowPane GetPane(string name)
+        {
+            Window window = _Dte.Windows.Item(Constants.vsWindowKindOutput);
+            OutputWindow outputWindow = (OutputWindow)window.Object;
+            foreach (OutputWindowPane pane in outputWindow.OutputWindowPanes)
+            {
+                if (pane.Name == name)
+                    return pane;
+            }
+            return outputWindow.OutputWindowPanes.Add(name);
+        }
+
         /// <summary>
-        ///     This function is the callback used to execute a command when the a menu item is clicked.
-        ///     See the Initialize method to see how the menu item is associated to this function using
-        ///     the OleMenuCommandService service and the MenuCommand class.
+        ///     This function is used to execute a command when the a menu item is clicked.
         /// </summary>
-        public void MenuItemCallback(object sender, EventArgs e)
+        public void DoFix()
         {
             if (_WorkerThread != null)
                 return;
             _OutputWindow.Clear();
             _FormConflicts.Hide();
+            if (MessageBox.Show(
+                "To avoid possible side effects please make sure your solution compiles completely without any errors at all!\r\n\r\nAlso make sure you have a backup or current commit.\r\n\r\nContinue?",
+                "Naming Fix", MessageBoxButtons.YesNo, MessageBoxIcon.Warning) != DialogResult.Yes)
+                return;
             _WorkStatus.MainValue = 0;
             _WorkStatus.SetText("Initializing", false);
             _WorkStatus.Exception = "";
             ShowStatus();
-            _StatusForm.Show();
+            _FormStatus.Show();
             _WorkerThread = new System.Threading.Thread(Execute);
             _WorkerThread.Start();
             _UpdateTimer.Start();
@@ -108,7 +121,7 @@ namespace NamingFix
         {
             if (!_WorkerThread.IsAlive)
             {
-                _StatusForm.Hide();
+                _FormStatus.Hide();
                 _UpdateTimer.Stop();
                 _WorkerThread = null;
                 if (_WorkStatus.Exception != "")
@@ -122,12 +135,12 @@ namespace NamingFix
 
         private void ShowStatus()
         {
-            _StatusForm.pbMain.Value = _WorkStatus.MainValue;
+            _FormStatus.pbMain.Value = _WorkStatus.MainValue;
             int value = _WorkStatus.SubValue;
-            _StatusForm.pbSub.Maximum = _WorkStatus.SubMax;
-            if (value <= _StatusForm.pbSub.Maximum)
-                _StatusForm.pbSub.Value = value;
-            _StatusForm.lblText.Text = _WorkStatus.Text;
+            _FormStatus.pbSub.Maximum = _WorkStatus.SubMax;
+            if (value <= _FormStatus.pbSub.Maximum)
+                _FormStatus.pbSub.Value = value;
+            _FormStatus.lblText.Text = _WorkStatus.Text;
         }
 
         private void Execute()
@@ -138,16 +151,20 @@ namespace NamingFix
                 CTypeResolver.AddTypes();
                 FoundTypes.Clear();
                 Conflicts.Clear();
-                BuildClassTree();
-                _RuleSet = new CRenameRuleSet();
-                SetNewNames();
-                if (CheckChanges())
-                    ApplyChanges();
+                if (BuildClassTree())
+                {
+                    CountElements();
+                    GetInheritanceInfo();
+                    _RuleSet = new CRenameRuleSet();
+                    SetNewNames();
+                    if (CheckChanges() && Conflicts.Count == 0)
+                        ApplyChanges();
 
-                Message("\r\nFound local var types:");
-                foreach (string type in FoundTypes.Where(type => !CTypeResolver.IsType(type)))
-                    Message(type);
-                Message("IMPORTANT: Check if all found types above are actual types otherwhise use undo and fix addin!");
+                    Message("\r\nFound local var types:");
+                    foreach (string type in FoundTypes.Where(type => !CTypeResolver.IsType(type)))
+                        Message(type);
+                    Message("IMPORTANT: Check if all found types above are actual types otherwhise use undo and fix addin!");
+                }
             }
             catch (Exception exception)
             {
@@ -172,35 +189,28 @@ namespace NamingFix
         }
 
         #region BuildClassTree
-        private static bool CountElems(CRenameItem item)
-        {
-            _ElCount++;
-            return true;
-        }
-
-        private void BuildClassTree()
+        private bool BuildClassTree()
         {
             _WorkStatus.SetText("Gathering classes");
             _RenameItems = new CRenameItemNamespace();
             _SysClassCache.Clear();
-            _WorkStatus.SubMax = _Dte.Solution.Projects.Count * 101;
+            _WorkStatus.SubMax = _Dte.Solution.Projects.Count * 41;
+            if (_Dte.Solution.Projects.Count == 0)
+            {
+                _WorkStatus.Exception = "No Projects to process. Please open one before applying this!";
+                return false;
+            }
             foreach (Project project in _Dte.Solution.Projects)
             {
-                _WorkStatus.SubMax += project.ProjectItems.Count - 100;
+                _WorkStatus.SubMax += project.ProjectItems.Count - 40;
                 IterateProjectItems(project.ProjectItems);
                 _WorkStatus.SubValue++;
             }
-            _WorkStatus.SetText("Gathering class inheritance info");
-            _WorkStatus.SubMax = 21;
-            _ElCount = 0;
-            TraverseItemContainer(CountElems);
-            AddInheritedInfoToMembers(_RenameItems);
+            return true;
         }
 
         private void IterateProjectItems(ProjectItems projectItems)
         {
-            if (projectItems == null)
-                return;
             foreach (ProjectItem item in projectItems)
             {
                 if (item.Kind == Constants.vsProjectItemKindPhysicalFile && item.Name.EndsWith(".cs") &&
@@ -284,6 +294,26 @@ namespace NamingFix
                 }
                 catch {}
             }
+        }
+
+        private static bool CountElems(CRenameItem item)
+        {
+            _ElCount++;
+            return true;
+        }
+
+        private void CountElements()
+        {
+            _WorkStatus.SetText("Initializing and counting elements");
+            _ElCount = 0;
+            TraverseItemContainer(CountElems);
+        }
+
+        private void GetInheritanceInfo()
+        {
+            _WorkStatus.SetText("Gathering inheritance info");
+            _WorkStatus.SubMax = 21;
+            AddInheritedInfoToMembers(_RenameItems);
         }
 
         private void AddInheritedInfoToMembers(CRenameItemClass child)
@@ -484,8 +514,7 @@ namespace NamingFix
         {
             if (String.IsNullOrEmpty(prefix))
                 return;
-            if (!theString.StartsWith(prefix))
-                theString = prefix + theString;
+            theString = prefix + theString;
         }
         #endregion
 
@@ -539,7 +568,7 @@ namespace NamingFix
         #endregion
 
         #region ApplyChanges
-        private bool ApplyChangesPre(CRenameItem item)
+        private static bool ApplyChangesPre(CRenameItem item)
         {
             _WorkStatus.SubValue++;
             if (!(item is CRenameItemLocalVariable))
@@ -553,7 +582,7 @@ namespace NamingFix
             return true;
         }
 
-        private bool ApplyChangesLocalVar(CRenameItem item)
+        private static bool ApplyChangesLocalVar(CRenameItem item)
         {
             _WorkStatus.SubValue++;
             CRenameItemMethod method = item as CRenameItemMethod;
@@ -572,21 +601,26 @@ namespace NamingFix
             _WorkStatus.SubValue++;
             if (!(item is CRenameItemLocalVariable))
             {
-                if (item.Name != item.NewName)
+                if (item.Name.StartsWith(_TmpPrefix))
                 {
-                    item.NewName = item.NewName.Substring(_TmpPrefix.Length);
+                    item.NewName = item.Name.Substring(_TmpPrefix.Length);
                     item.Rename();
                 }
             }
             return true;
         }
 
-        private bool ApplyChanges()
+        private void ApplyChanges()
         {
-            _WorkStatus.SubMax = _ElCount * 3;
-            return TraverseItemContainer(ApplyChangesPre) &&
-                   TraverseItemContainer(ApplyChangesLocalVar) &&
-                   TraverseItemContainer(ApplyChangesPost);
+            _WorkStatus.SetText("Applying changes");
+            _WorkStatus.SubMax = _ElCount * 2;
+            if (!TraverseItemContainer(ApplyChangesPre) || !TraverseItemContainer(ApplyChangesLocalVar))
+                return;
+            BuildClassTree();
+            CountElements();
+            _WorkStatus.SetText("Applying final changes");
+            _WorkStatus.SubMax = _ElCount;
+            TraverseItemContainer(ApplyChangesPost);
         }
         #endregion
 
@@ -719,7 +753,10 @@ namespace NamingFix
                             _WorkStatus.SubValue++;
                         }
                     }
-                    catch {}
+                    catch
+                    {
+                        _WorkStatus.SubValue += 250;
+                    }
                     _WorkStatus.SubValue++;
                 }
             }
@@ -732,6 +769,30 @@ namespace NamingFix
                 return _Alias.Contains(typeName);
                 // ReSharper restore PossibleNullReferenceException
             }
+        }
+
+        // Implementierung der Schnittstelle IDisposable
+        public void Dispose()
+        {
+            Dispose(true);
+            GC.SuppressFinalize(this);
+        }
+
+        private void Dispose(bool disposing)
+        {
+            if (!_IsDisposed)
+            {
+                // Methode wird zum ersten Mal aufgerufen
+                if (disposing)
+                {
+                    _FormConflicts.Dispose();
+                    _FormStatus.Dispose();
+                    _UpdateTimer.Dispose();
+                }
+                // Hier unmanaged Objekte freigeben (z.B. IntPtr)
+            }
+            // Dafür sorgen, dass Methode nicht mehr aufgerufen werden kann.
+            _IsDisposed = true;
         }
     }
 }
