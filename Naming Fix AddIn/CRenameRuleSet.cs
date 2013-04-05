@@ -60,6 +60,7 @@ namespace NamingFix
 
         public CRenameRuleSet()
         {
+            //TODO: Define your rules here or implement a config screen!
             Const = new SRenameRule[3];
             Field = new SRenameRule[3];
             Property = new SRenameRule[3];
@@ -71,10 +72,10 @@ namespace NamingFix
             Field[Priv].Prefix = "_";
             Method[Priv].Prefix = "_";
             Property[Priv].Prefix = "_";
-            Const[Prot].RemovePrefix = "_";
-            Field[Prot].RemovePrefix = "_";
-            Method[Prot].RemovePrefix = "_";
-            Property[Prot].RemovePrefix = "_";
+            Const[Prot].Prefix = "_";
+            Field[Prot].Prefix = "_";
+            Method[Prot].Prefix = "_";
+            Property[Prot].Prefix = "_";
             Const[Pub].RemovePrefix = "_";
             Field[Pub].RemovePrefix = "_";
             Method[Pub].RemovePrefix = "_";

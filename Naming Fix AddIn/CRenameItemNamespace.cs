@@ -47,10 +47,10 @@ namespace NamingFix
             }
         }
 
-        public override bool IsRenameValid()
+        public override CRenameItem GetConflictItem()
         {
             //Renaming if namespaces is currently not supported!
-            return (Name == NewName);
+            return Name == NewName ? null : this;
         }
 
         public void Add(CRenameItem item)
@@ -69,23 +69,40 @@ namespace NamingFix
             item.IsSystem = IsSystem;
         }
 
-        public bool IsConflictLocVar(string newName, string oldName)
+        public CRenameItem GetConflictLocVar(string newName, string oldName)
         {
-            return Classes.Any(item => item.IsConflictLocVar(newName, oldName));
+// ReSharper disable LoopCanBeConvertedToQuery
+            foreach (var cClass in Classes)
+// ReSharper restore LoopCanBeConvertedToQuery
+            {
+                CRenameItem item = cClass.GetConflictLocVar(newName, oldName);
+                if (item != null)
+                    return item;
+            }
+            return null;
         }
 
-        public bool IsConflictType(string newName, string oldName)
+        public CRenameItem GetConflictType(string newName, string oldName)
         {
-            return Classes.IsConflict(newName, oldName) ||
-                   Interfaces.IsConflict(newName, oldName) ||
-                   Namespaces.IsConflict(newName, oldName) ||
-                   Parent != null && Parent.IsConflictType(newName, oldName);
+            CRenameItem item = Classes.GetConflict(newName, oldName);
+            if (item != null)
+                return item;
+            item = Interfaces.GetConflict(newName, oldName);
+            if (item != null)
+                return item;
+            item = Types.GetConflict(newName, oldName);
+            if (item != null)
+                return item;
+            item = Namespaces.GetConflict(newName, oldName);
+            if (item != null)
+                return item;
+            return (Parent == null) ? null : Parent.GetConflictType(newName, oldName);
         }
 
-        public bool IsConflictId(string newName, string oldName)
+        public CRenameItem GetConflictId(string newName, string oldName)
         {
             //No ids, so no conflicts
-            return false;
+            return null;
         }
 
         private CRenameItem FindTypeNameDown(String typeName)

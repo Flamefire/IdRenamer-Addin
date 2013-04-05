@@ -29,18 +29,30 @@ namespace NamingFix
             InitializeComponent();
         }
 
-        private void LbConflictsClick(object sender, EventArgs e)
+        private void lbConflicts_MouseUp(object sender, MouseEventArgs e)
         {
             int sel = lbConflicts.SelectedIndex;
             if (sel < 0)
                 return;
             try
             {
-                CNamingFix.Conflicts[sel].Show();
+                if (e.Button == MouseButtons.Left)
+                    CNamingFix.Conflicts[sel].Item1.Show();
+                else
+                    CNamingFix.Conflicts[sel].Item2.Show();
             }
             catch
             {
                 MessageBox.Show("Item not found. Maybe it has been deleted, renamed are moved!", "Cannot show item", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            }
+        }
+
+        private void lbConflicts_MouseDown(object sender, MouseEventArgs e)
+        {
+            int index = lbConflicts.IndexFromPoint(e.Location);
+            if (index != ListBox.NoMatches)
+            {
+                lbConflicts.SelectedIndex = index;
             }
         }
     }

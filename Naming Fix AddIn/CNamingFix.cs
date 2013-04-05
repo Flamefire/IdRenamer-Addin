@@ -28,6 +28,8 @@ using System.Windows.Forms;
 
 namespace NamingFix
 {
+    using ItemTuple = Tuple<CRenameItem, CRenameItem>;
+
     class CNamingFix : IDisposable
     {
         private struct SWorkStatus
@@ -63,7 +65,7 @@ namespace NamingFix
 
         private readonly CFormStatus _FormStatus = new CFormStatus();
         private readonly CFormConflicts _FormConflicts = new CFormConflicts();
-        public static readonly List<CRenameItem> Conflicts = new List<CRenameItem>();
+        public static readonly List<ItemTuple> Conflicts = new List<ItemTuple>();
         private static int _ElCount;
         private const string _TmpPrefix = "RNFTMPPRE";
         private System.Threading.Thread _WorkerThread;
@@ -145,6 +147,7 @@ namespace NamingFix
 
         private void Execute()
         {
+            Message("Analysis started!");
             _Dte.UndoContext.Open("Item renaming");
             try
             {
@@ -173,17 +176,29 @@ namespace NamingFix
             _Dte.UndoContext.Close();
         }
 
+        private static void AddParentName(ref String name, CRenameItem item)
+        {
+            if (string.IsNullOrEmpty(item.Parent.Name))
+                return;
+            if (item.Parent is CRenameItemType || item.Parent is CRenameItemNamespace)
+                name = item.Parent.Name;
+            else
+                name += " in " + item.Parent.Name;
+        }
+
         private void ShowConflicts()
         {
             if (Conflicts.Count == 0)
                 return;
             _FormConflicts.lbConflicts.Items.Clear();
-            foreach (CRenameItem item in Conflicts)
+            foreach (var item in Conflicts)
             {
-                string name = item.Name;
-                if (!string.IsNullOrEmpty(item.Parent.Name))
-                    name += " in " + item.Parent.Name;
-                _FormConflicts.lbConflicts.Items.Add(item.GetTypeName() + " " + name + " --> " + item.NewName);
+                string name = item.Item1.Name;
+                AddParentName(ref name, item.Item1);
+                string name2 = item.Item2.Name;
+                if (item.Item1.Parent.Name != item.Item2.Parent.Name)
+                    AddParentName(ref name2, item.Item2);
+                _FormConflicts.lbConflicts.Items.Add(item.Item1.GetTypeName() + " " + name + " --> " + item.Item1.NewName + " <=> " + item.Item2.GetTypeName() + " " + name2);
             }
             _FormConflicts.Show();
         }
@@ -216,7 +231,9 @@ namespace NamingFix
                 if (item.Kind == Constants.vsProjectItemKindPhysicalFile && item.Name.EndsWith(".cs") &&
                     item.FileCodeModel.Language == CodeModelLanguageConstants.vsCMLanguageCSharp)
                 {
+#if(DEBUG)
                     Message("File " + item.Name + ":");
+#endif
                     IterateCodeElements(item.FileCodeModel.CodeElements, _RenameItems);
                 }
                 ProjectItems subItems = item.SubProject != null ? item.SubProject.ProjectItems : item.ProjectItems;
@@ -355,7 +372,9 @@ namespace NamingFix
         {
             if (child.IsInheritedLoaded)
                 return;
+#if(DEBUG)
             Message("Get inherited: " + child.Name);
+#endif
             foreach (CodeElement baseClass in child.GetElement().Bases)
                 ProcessBaseElement<CRenameItemClass>(baseClass, child);
             foreach (CodeElement implInterface in child.GetElement().ImplementedInterfaces)
@@ -368,7 +387,9 @@ namespace NamingFix
         {
             if (child.IsInheritedLoaded)
                 return;
+#if(DEBUG)
             Message("Get inherited: " + child.Name);
+#endif
             foreach (CodeElement element in child.GetElement().Bases)
                 ProcessBaseElement<CRenameItemInterface>(element, child);
             child.IsInheritedLoaded = true;
@@ -529,8 +550,8 @@ namespace NamingFix
             // ReSharper disable CanBeReplacedWithTryCastAndCheckForNull
             _WorkStatus.SubValue++;
             if (item.IsSystem)
-                item.NewName = item.Name;
-            else if (item is CRenameItemClass)
+                return true;
+            if (item is CRenameItemClass)
                 SetNewName(item, _RuleSet.Class);
             else if (item is CRenameItemInterface)
                 SetNewName(item, _RuleSet.Interface);
@@ -553,8 +574,12 @@ namespace NamingFix
                 item.NewName = GetNewName(((CRenameItemProperty)item).GetElement());
             else if (item is CRenameItemParameter)
                 SetNewName(item, _RuleSet.Parameter);
-            else if (item is CRenameItemMethod)
-                item.NewName = GetNewName(((CRenameItemMethod)item).GetElement());
+            else
+            {
+                CRenameItemMethod method = item as CRenameItemMethod;
+                if (method != null && !method.IsDllImport())
+                    item.NewName = GetNewName(((CRenameItemMethod)item).GetElement());
+            }
             return true;
             // ReSharper restore CanBeReplacedWithTryCastAndCheckForNull
         }
@@ -627,14 +652,14 @@ namespace NamingFix
         private static bool CheckChanges(CRenameItem item)
         {
             _WorkStatus.SubValue++;
-            if (item.IsRenameValid())
+            CRenameItem conflictItem = item.GetConflictItem();
+            if (conflictItem == null)
                 return true;
             string name = item.Name;
-            if (!string.IsNullOrEmpty(item.Parent.Name))
-                name = item.Parent.Name + "." + name;
+            AddParentName(ref name, item);
             Message("Cannot rename " + item.GetTypeName() + " " + name + " to " + item.NewName +
                     " as another identifier with the same name already exists or is about to be renamed to the same name!");
-            Conflicts.Add(item);
+            Conflicts.Add(new ItemTuple(item, conflictItem));
             return true;
         }
 

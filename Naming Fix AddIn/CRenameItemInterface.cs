@@ -53,23 +53,29 @@ namespace NamingFix
             item.IsSystem = IsSystem;
         }
 
-        public virtual bool IsConflictLocVar(string newName, string oldName)
+        public virtual CRenameItem GetConflictLocVar(string newName, string oldName)
         {
             //No local vars in interfaces
-            return false;
+            return null;
         }
 
-        public virtual bool IsConflictType(string newName, string oldName)
+        public virtual CRenameItem GetConflictType(string newName, string oldName)
         {
-            return Parent != null && Parent.IsConflictType(newName, oldName);
+            return Parent == null ? null : Parent.GetConflictType(newName, oldName);
         }
 
-        public virtual bool IsConflictId(string newName, string oldName)
+        public virtual CRenameItem GetConflictId(string newName, string oldName)
         {
-            return Properties.IsConflict(newName, oldName) ||
-                   Methods.IsConflict(newName, oldName) ||
-                   Events.IsConflict(newName, oldName) ||
-                   (Parent != null && Parent.IsConflictId(newName, oldName));
+            CRenameItem item = Properties.GetConflict(newName, oldName);
+            if (item != null)
+                return item;
+            item = Methods.GetConflict(newName, oldName);
+            if (item != null)
+                return item;
+            item = Events.GetConflict(newName, oldName);
+            if (item != null)
+                return item;
+            return (Parent == null) ? null : Parent.GetConflictId(newName, oldName);
         }
 
         public virtual void CopyIds(CRenameItemInterfaceBase otherItem)
@@ -115,19 +121,31 @@ namespace NamingFix
                 _DerivedStuff.CopyIds(otherItem2._DerivedStuff);
         }
 
-        public override bool IsConflictLocVar(string newName, string oldName)
+        public override CRenameItem GetConflictLocVar(string newName, string oldName)
         {
-            return base.IsConflictLocVar(newName, oldName) || _InheritedStuff.IsConflictLocVar(newName, oldName) || _DerivedStuff.IsConflictLocVar(newName, oldName);
+            CRenameItem item = base.GetConflictLocVar(newName, oldName);
+            if (item != null)
+                return item;
+            item = _InheritedStuff.GetConflictLocVar(newName, oldName);
+            return item ?? _DerivedStuff.GetConflictLocVar(newName, oldName);
         }
 
-        public override bool IsConflictType(string newName, string oldName)
+        public override CRenameItem GetConflictType(string newName, string oldName)
         {
-            return base.IsConflictType(newName, oldName) || _InheritedStuff.IsConflictType(newName, oldName) || _DerivedStuff.IsConflictType(newName, oldName);
+            CRenameItem item = base.GetConflictType(newName, oldName);
+            if (item != null)
+                return item;
+            item = _InheritedStuff.GetConflictType(newName, oldName);
+            return item ?? _DerivedStuff.GetConflictType(newName, oldName);
         }
 
-        public override bool IsConflictId(string newName, string oldName)
+        public override CRenameItem GetConflictId(string newName, string oldName)
         {
-            return base.IsConflictId(newName, oldName) || _InheritedStuff.IsConflictId(newName, oldName) || _DerivedStuff.IsConflictId(newName, oldName);
+            CRenameItem item = base.GetConflictId(newName, oldName);
+            if (item != null)
+                return item;
+            item = _InheritedStuff.GetConflictId(newName, oldName);
+            return item ?? _DerivedStuff.GetConflictId(newName, oldName);
         }
     }
 }

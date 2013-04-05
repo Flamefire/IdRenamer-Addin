@@ -17,6 +17,7 @@
 //  */
 #endregion
 
+using System.Text.RegularExpressions;
 using EnvDTE;
 using EnvDTE80;
 using System.Collections.Generic;
@@ -43,11 +44,19 @@ namespace NamingFix
         public abstract TextPoint StartPoint { get; }
 
         public abstract void Rename();
-        public abstract bool IsRenameValid();
+        private static readonly Regex _ReCaps = new Regex("(?<=[a-z])[A-Z]", RegexOptions.Compiled);
+
+        /// <summary>
+        /// Gets one element whose name is conflicting with this one
+        /// Or null if no conflict is found 
+        /// </summary>
+        /// <returns></returns>
+        public abstract CRenameItem GetConflictItem();
 
         public string GetTypeName()
         {
-            return GetType().Name.Substring("CRenameItem".Length);
+            string typeName = GetType().Name.Substring("CRenameItem".Length);
+            return _ReCaps.Replace(typeName, m => " " + m.Value.ToLower());
         }
 
         public void Show()
@@ -105,17 +114,17 @@ namespace NamingFix
         /// <summary>
         ///     Checks if given Id collides with local variable
         /// </summary>
-        bool IsConflictLocVar(string newName, string oldName);
+        CRenameItem GetConflictLocVar(string newName, string oldName);
 
         /// <summary>
         ///     Checks if given Id collides with type
         /// </summary>
-        bool IsConflictType(string newName, string oldName);
+        CRenameItem GetConflictType(string newName, string oldName);
 
         /// <summary>
         ///     Checks if given Id collides with Id(Property, Variable, Function)
         /// </summary>
-        bool IsConflictId(string newName, string oldName);
+        CRenameItem GetConflictId(string newName, string oldName);
 
         /// <summary>
         ///     Finds given typename, which is valid in context of current class
@@ -130,9 +139,9 @@ namespace NamingFix
             base.Add((T)item);
         }
 
-        public bool IsConflict(string newName, string oldName)
+        public CRenameItem GetConflict(string newName, string oldName)
         {
-            return this.Any(item => item.NewName == newName && item.Name != oldName);
+            return this.FirstOrDefault(item => item.NewName == newName && item.Name != oldName);
         }
 
         public T Find(string name)
@@ -143,11 +152,12 @@ namespace NamingFix
 
     abstract class CRenameItemVariableBase : CRenameItemElement
     {
-        public override bool IsRenameValid()
+        public override CRenameItem GetConflictItem()
         {
             if (Name == NewName)
-                return true;
-            return !Parent.IsConflictLocVar(NewName, Name) && !Parent.IsConflictId(NewName, Name);
+                return null;
+            CRenameItem item = Parent.GetConflictLocVar(NewName, Name);
+            return item ?? Parent.GetConflictId(NewName, Name);
         }
     }
 
@@ -171,11 +181,11 @@ namespace NamingFix
 
     class CRenameItemType : CRenameItemElement
     {
-        public override bool IsRenameValid()
+        public override CRenameItem GetConflictItem()
         {
             if (Name == NewName)
-                return true;
-            return !Parent.IsConflictType(NewName, Name);
+                return null;
+            return Parent.GetConflictType(NewName, Name);
         }
     }
 

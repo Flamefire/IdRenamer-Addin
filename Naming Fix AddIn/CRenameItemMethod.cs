@@ -17,6 +17,7 @@
 //  */
 #endregion
 
+using System.Linq;
 using EnvDTE;
 using EnvDTE80;
 using System;
@@ -50,6 +51,11 @@ namespace NamingFix
         private static readonly Regex _ReCommentSl = new Regex(@"//[^\r\n]*\r\n", RegexOptions.Compiled | RegexOptions.Singleline);
         private static readonly Regex _ReCommentMl = new Regex(@"/\*.*?\*/", RegexOptions.Compiled | RegexOptions.Multiline);
 
+        public bool IsDllImport()
+        {
+            return GetElement().Attributes.Cast<CodeAttribute>().Any(x => x.Name == "DllImport");
+        }
+
         public override bool IsSystem
         {
             set
@@ -81,22 +87,15 @@ namespace NamingFix
         public void ReloadText()
         {
             CodeFunction2 func = GetElement();
-            if (IsSystem || func.MustImplement)
+            if (IsSystem || IsDllImport() || func.MustImplement)
                 _Text = "";
             else
             {
-                try
-                {
-                    _StartPt = func.GetStartPoint(vsCMPart.vsCMPartBody).CreateEditPoint();
-                    _EndPt = func.GetEndPoint(vsCMPart.vsCMPartBody);
-                    String text = "{" + _StartPt.GetText(_EndPt);
-                    RemoveTextComments(ref text);
-                    _Text = text;
-                }
-                catch
-                {
-                    _Text = "";
-                }
+                _StartPt = func.GetStartPoint(vsCMPart.vsCMPartBody).CreateEditPoint();
+                _EndPt = func.GetEndPoint(vsCMPart.vsCMPartBody);
+                String text = "{" + _StartPt.GetText(_EndPt);
+                RemoveTextComments(ref text);
+                _Text = text;
             }
         }
 
@@ -113,7 +112,9 @@ namespace NamingFix
             MatchCollection locVars = _ReLocVar.Matches(Text);
             if (locVars.Count <= 0)
                 return;
+#if (DEBUG)
             CNamingFix.Message("Method " + Name + ":");
+#endif
             //First capture all vars, rename, check for 2 vars with same name and possible colliding space
             foreach (Match match in locVars)
             {
@@ -123,7 +124,9 @@ namespace NamingFix
                     continue;
                 if (((CRenameItemInterfaceBase)Parent).FindTypeByName(type) == null && !CNamingFix.FoundTypes.Contains(type))
                     CNamingFix.FoundTypes.Add(type);
+#if (DEBUG)
                 CNamingFix.Message(name + "\t(" + type + ")");
+#endif
                 CRenameItemLocalVariable item = new CRenameItemLocalVariable {Name = name, Parent = this, IsConst = match.Groups[2].Value != ""};
                 Add(item);
             }
@@ -174,27 +177,28 @@ namespace NamingFix
             item.Parent = this;
         }
 
-        public bool IsConflictLocVar(string newName, string oldName)
+        public CRenameItem GetConflictLocVar(string newName, string oldName)
         {
-            return Parameters.IsConflict(newName, oldName) ||
-                   LocalVars.IsConflict(newName, oldName);
+            CRenameItem item = Parameters.GetConflict(newName, oldName);
+            return item ?? LocalVars.GetConflict(newName, oldName);
         }
 
-        public bool IsConflictType(string newName, string oldName)
+        public CRenameItem GetConflictType(string newName, string oldName)
         {
-            return Parent.IsConflictType(newName, oldName);
+            return Parent.GetConflictType(newName, oldName);
         }
 
-        public bool IsConflictId(string newName, string oldName)
+        public CRenameItem GetConflictId(string newName, string oldName)
         {
-            return Parent.IsConflictId(newName, oldName);
+            return Parent.GetConflictId(newName, oldName);
         }
 
-        public override bool IsRenameValid()
+        public override CRenameItem GetConflictItem()
         {
-            return (Name == NewName) ||
-                   (!Parent.IsConflictLocVar(NewName, Name) &&
-                    !Parent.IsConflictId(NewName, Name));
+            if (Name == NewName)
+                return null;
+            CRenameItem item = Parent.GetConflictLocVar(NewName, Name);
+            return item ?? Parent.GetConflictId(NewName, Name);
         }
 
         public CRenameItem FindTypeByName(string typeName)
