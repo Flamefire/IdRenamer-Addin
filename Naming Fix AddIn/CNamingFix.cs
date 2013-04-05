@@ -79,6 +79,7 @@ namespace NamingFix
         {
             _Dte = dte;
             _OutputWindow = GetPane("Naming Fix AddIn");
+            _OutputWindow.Activate();
             _FormStatus.pbMain.Maximum = 9;
             _UpdateTimer.Interval = 80;
             _UpdateTimer.Tick += Timer_ShowStatus;
@@ -577,7 +578,8 @@ namespace NamingFix
             else
             {
                 CRenameItemMethod method = item as CRenameItemMethod;
-                if (method != null && !method.IsDllImport())
+                //Just rename methods that are not extern and no constructors/destructors
+                if (method != null && !method.IsExtern() && !method.Name.StartsWith("~") && method.Name != method.Parent.Name)
                     item.NewName = GetNewName(((CRenameItemMethod)item).GetElement());
             }
             return true;
@@ -600,6 +602,7 @@ namespace NamingFix
             {
                 if (item.Name != item.NewName)
                 {
+                    Message("Renaming " + item.Parent.Name + "." + item.Name);
                     item.NewName = _TmpPrefix + item.NewName;
                     item.Rename();
                 }
@@ -733,7 +736,6 @@ namespace NamingFix
 
         public static void Message(string msg)
         {
-            _OutputWindow.Activate();
             _OutputWindow.OutputString(msg + "\r\n");
         }
 

@@ -51,9 +51,9 @@ namespace NamingFix
         private static readonly Regex _ReCommentSl = new Regex(@"//[^\r\n]*\r\n", RegexOptions.Compiled | RegexOptions.Singleline);
         private static readonly Regex _ReCommentMl = new Regex(@"/\*.*?\*/", RegexOptions.Compiled | RegexOptions.Multiline);
 
-        public bool IsDllImport()
+        public bool IsExtern()
         {
-            return GetElement().Attributes.Cast<CodeAttribute>().Any(x => x.Name == "DllImport");
+            return GetElement().Attributes.Cast<CodeAttribute>().Any(x => x.Name == "DllImport" || x.Name == "MethodImpl");
         }
 
         public override bool IsSystem
@@ -87,7 +87,7 @@ namespace NamingFix
         public void ReloadText()
         {
             CodeFunction2 func = GetElement();
-            if (IsSystem || IsDllImport() || func.MustImplement)
+            if (IsSystem || IsExtern() || func.MustImplement)
                 _Text = "";
             else
             {
