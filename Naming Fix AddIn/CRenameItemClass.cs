@@ -60,35 +60,35 @@ namespace NamingFix
             item.IsSystem = IsSystem;
         }
 
-        public override CRenameItem GetConflictLocVar(string newName, string oldName)
+        public override CRenameItem GetConflictLocVar(string newName, string oldName, bool swapCheck)
         {
             // ReSharper disable LoopCanBeConvertedToQuery
             foreach (var method in Methods)
                 // ReSharper restore LoopCanBeConvertedToQuery
             {
-                CRenameItem item = method.GetConflictLocVar(newName, oldName);
+                CRenameItem item = method.GetConflictLocVar(newName, oldName, swapCheck);
                 if (item != null)
                     return item;
             }
             return null;
         }
 
-        public override CRenameItem GetConflictType(string newName, string oldName)
+        public override CRenameItem GetConflictType(string newName, string oldName, bool swapCheck)
         {
-            CRenameItem item = Classes.GetConflict(newName, oldName);
+            CRenameItem item = Classes.GetConflict(newName, oldName, swapCheck);
             if (item != null)
                 return item;
-            item = Interfaces.GetConflict(newName, oldName);
+            item = Interfaces.GetConflict(newName, oldName, swapCheck);
             if (item != null)
                 return item;
-            item = Types.GetConflict(newName, oldName);
-            return item ?? base.GetConflictType(newName, oldName);
+            item = Types.GetConflict(newName, oldName, swapCheck);
+            return item ?? base.GetConflictType(newName, oldName, swapCheck);
         }
 
-        public override CRenameItem GetConflictId(string newName, string oldName)
+        public override CRenameItem GetConflictId(string newName, string oldName, bool swapCheck)
         {
-            CRenameItem item = Variables.GetConflict(newName, oldName);
-            return item ?? base.GetConflictId(newName, oldName);
+            CRenameItem item = Variables.GetConflict(newName, oldName, swapCheck);
+            return item ?? base.GetConflictId(newName, oldName, swapCheck);
         }
 
         public override void CopyIds(CRenameItemInterfaceBase otherItem)
@@ -132,7 +132,7 @@ namespace NamingFix
 
     class CRenameItemClass : CRenameItemClassBase
     {
-        private readonly CRenameItemClassBase _InheritedStuff = new CRenameItemClassBase();
+        public readonly CRenameItemClassBase InheritedStuff = new CRenameItemClassBase();
         private readonly CRenameItemClassBase _DerivedStuff = new CRenameItemClassBase();
 
         public CodeClass2 GetElement()
@@ -142,10 +142,10 @@ namespace NamingFix
 
         public override void CopyIds(CRenameItemInterfaceBase otherItem)
         {
-            _InheritedStuff.CopyIds(otherItem);
+            InheritedStuff.CopyIds(otherItem);
             CRenameItemClass otherItem2 = otherItem as CRenameItemClass;
             if (otherItem2 != null)
-                _InheritedStuff.CopyIds(otherItem2._InheritedStuff);
+                InheritedStuff.CopyIds(otherItem2.InheritedStuff);
         }
 
         public override void CopyIdsDerived(CRenameItemInterfaceBase otherItem)
@@ -159,34 +159,34 @@ namespace NamingFix
         public override CRenameItem FindTypeByName(string typeName)
         {
             CRenameItem result = base.FindTypeByName(typeName);
-            return result ?? _InheritedStuff.FindTypeByName(typeName);
+            return result ?? InheritedStuff.FindTypeByName(typeName);
         }
 
-        public override CRenameItem GetConflictLocVar(string newName, string oldName)
+        public override CRenameItem GetConflictLocVar(string newName, string oldName, bool swapCheck)
         {
-            CRenameItem item = base.GetConflictLocVar(newName, oldName);
+            CRenameItem item = base.GetConflictLocVar(newName, oldName, swapCheck);
             if (item != null)
                 return item;
-            item = _InheritedStuff.GetConflictLocVar(newName, oldName);
-            return item ?? _DerivedStuff.GetConflictLocVar(newName, oldName);
+            item = InheritedStuff.GetConflictLocVar(newName, oldName, swapCheck);
+            return item ?? _DerivedStuff.GetConflictLocVar(newName, oldName, swapCheck);
         }
 
-        public override CRenameItem GetConflictType(string newName, string oldName)
+        public override CRenameItem GetConflictType(string newName, string oldName, bool swapCheck)
         {
-            CRenameItem item = base.GetConflictType(newName, oldName);
+            CRenameItem item = base.GetConflictType(newName, oldName, swapCheck);
             if (item != null)
                 return item;
-            item = _InheritedStuff.GetConflictType(newName, oldName);
-            return item ?? _DerivedStuff.GetConflictType(newName, oldName);
+            item = InheritedStuff.GetConflictType(newName, oldName, swapCheck);
+            return item ?? _DerivedStuff.GetConflictType(newName, oldName, swapCheck);
         }
 
-        public override CRenameItem GetConflictId(string newName, string oldName)
+        public override CRenameItem GetConflictId(string newName, string oldName, bool swapCheck)
         {
-            CRenameItem item = base.GetConflictId(newName, oldName);
+            CRenameItem item = base.GetConflictId(newName, oldName, swapCheck);
             if (item != null)
                 return item;
-            item = _InheritedStuff.GetConflictId(newName, oldName);
-            return item ?? _DerivedStuff.GetConflictId(newName, oldName);
+            item = InheritedStuff.GetConflictId(newName, oldName, swapCheck);
+            return item ?? _DerivedStuff.GetConflictId(newName, oldName, swapCheck);
         }
     }
 }

@@ -50,12 +50,12 @@ namespace NamingFix
             parent.Text = Regex.Replace(parent.Text, @"(?<! new )(?<!\w|\.)" + nameRe + @"(?=( in )|\b(?!\s+[a-zA-Z_]))", NewName, RegexOptions.Singleline);
         }
 
-        public override CRenameItem GetConflictItem()
+        public override CRenameItem GetConflictItem(bool swapCheck)
         {
             if (Name == NewName)
                 return null;
-            CRenameItem item = Parent.GetConflictLocVar(NewName, Name);
-            return item ?? Parent.GetConflictId(NewName, Name);
+            CRenameItem item = Parent.GetConflictLocVar(NewName, Name, swapCheck);
+            return item ?? Parent.GetConflictId(NewName, Name, swapCheck);
         }
     }
 }

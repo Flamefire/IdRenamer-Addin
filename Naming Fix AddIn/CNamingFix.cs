@@ -36,7 +36,7 @@ namespace NamingFix
         {
             public int MainValue;
             public int SubValue, SubMax;
-            public string Text { get; private set; }
+            public string Text { get; set; }
             public string Exception;
 
             public void SetText(string text, bool addMain = true)
@@ -66,6 +66,7 @@ namespace NamingFix
         private readonly CFormStatus _FormStatus = new CFormStatus();
         private readonly CFormConflicts _FormConflicts = new CFormConflicts();
         public static readonly List<ItemTuple> Conflicts = new List<ItemTuple>();
+        private List<string> _ReservedWords;
         private static int _ElCount;
         private const string _TmpPrefix = "RNFTMPPRE";
         private System.Threading.Thread _WorkerThread;
@@ -73,8 +74,7 @@ namespace NamingFix
         private readonly Timer _UpdateTimer = new Timer();
         private bool _IsDisposed;
 
-        //Strings
-        //comments
+        #region Init
         public CNamingFix(DTE2 dte)
         {
             _Dte = dte;
@@ -83,19 +83,101 @@ namespace NamingFix
             _FormStatus.pbMain.Maximum = 9;
             _UpdateTimer.Interval = 80;
             _UpdateTimer.Tick += Timer_ShowStatus;
+            InitReservedWords();
         }
 
         private OutputWindowPane GetPane(string name)
         {
             Window window = _Dte.Windows.Item(Constants.vsWindowKindOutput);
             OutputWindow outputWindow = (OutputWindow)window.Object;
-            foreach (OutputWindowPane pane in outputWindow.OutputWindowPanes)
-            {
-                if (pane.Name == name)
-                    return pane;
-            }
-            return outputWindow.OutputWindowPanes.Add(name);
+            OutputWindowPane oPane = outputWindow.OutputWindowPanes.Cast<OutputWindowPane>().FirstOrDefault(pane => pane.Name == name);
+            return oPane ?? outputWindow.OutputWindowPanes.Add(name);
         }
+
+        private void InitReservedWords()
+        {
+            _ReservedWords = new List<string>
+                {
+                    "abstract",
+                    "as",
+                    "base",
+                    "bool",
+                    "break",
+                    "byte",
+                    "case",
+                    "catch",
+                    "char",
+                    "checked",
+                    "class",
+                    "const",
+                    "continue",
+                    "decimal",
+                    "default",
+                    "delegate",
+                    "do",
+                    "double",
+                    "else",
+                    "enum",
+                    "event",
+                    "explicit",
+                    "extern",
+                    "false",
+                    "finally",
+                    "fixed",
+                    "float",
+                    "for",
+                    "foreach",
+                    "goto",
+                    "if",
+                    "implicit",
+                    "in",
+                    "int",
+                    "interface",
+                    "internal",
+                    "is",
+                    "lock",
+                    "long",
+                    "namespace",
+                    "new",
+                    "null",
+                    "object",
+                    "operator",
+                    "out",
+                    "override",
+                    "params",
+                    "private",
+                    "protected",
+                    "public",
+                    "readonly",
+                    "ref",
+                    "return",
+                    "sbyte",
+                    "sealed",
+                    "short",
+                    "sizeof",
+                    "stackalloc",
+                    "static",
+                    "string",
+                    "struct",
+                    "switch",
+                    "this",
+                    "throw",
+                    "true",
+                    "try",
+                    "typeof",
+                    "uint",
+                    "ulong",
+                    "unchecked",
+                    "unsafe",
+                    "ushort",
+                    "using",
+                    "virtual",
+                    "void",
+                    "volatile",
+                    "while"
+                };
+        }
+        #endregion
 
         /// <summary>
         ///     This function is used to execute a command when the a menu item is clicked.
@@ -172,7 +254,7 @@ namespace NamingFix
             }
             catch (Exception exception)
             {
-                _WorkStatus.Exception = "Exception occured!:\r\n" + exception.Message;
+                _WorkStatus.Exception = "Exception occured!:\r\n" + exception.Message+"\r\n\r\nIf there have been any changes already applied, revert the whole solution or try to use undo!";
             }
             _Dte.UndoContext.Close();
         }
@@ -196,10 +278,17 @@ namespace NamingFix
             {
                 string name = item.Item1.Name;
                 AddParentName(ref name, item.Item1);
-                string name2 = item.Item2.Name;
-                if (item.Item1.Parent.Name != item.Item2.Parent.Name)
-                    AddParentName(ref name2, item.Item2);
-                _FormConflicts.lbConflicts.Items.Add(item.Item1.GetTypeName() + " " + name + " --> " + item.Item1.NewName + " <=> " + item.Item2.GetTypeName() + " " + name2);
+                string description;
+                if (item.Item2 != null)
+                {
+                    string name2 = item.Item2.Name;
+                    if (item.Item1.Parent.Name != item.Item2.Parent.Name)
+                        AddParentName(ref name2, item.Item2);
+                    description = " <=> " + item.Item2.GetTypeName() + " " + name2;
+                }
+                else
+                    description = "(reserved word)";
+                _FormConflicts.lbConflicts.Items.Add(item.Item1.GetTypeName() + " " + name + " --> " + item.Item1.NewName + description);
             }
             _FormConflicts.Show();
         }
@@ -432,41 +521,36 @@ namespace NamingFix
         #endregion
 
         #region GetNewName
-        private string GetNewName(CodeFunction2 func)
+        private string GetNewName(CRenameItemMethod func)
         {
-            return GetNewName((CodeElement)func, _RuleSet.Method, func.Access);
+            return GetNewName(func.Name, _RuleSet.Method, func.Access);
         }
 
-        private string GetNewName(CodeVariable2 variable)
+        private string GetNewName(CRenameItemVariable variable)
         {
-            if (variable.IsConstant)
-                return GetNewName((CodeElement)variable, _RuleSet.Const, variable.Access);
-            return GetNewName((CodeElement)variable, _RuleSet.Field, variable.Access);
+            if (variable.GetElement().IsConstant)
+                return GetNewName(variable.Name, _RuleSet.Const, variable.GetElement().Access);
+            return GetNewName(variable.Name, _RuleSet.Field, variable.GetElement().Access);
         }
 
-        private string GetNewName(CodeProperty2 property)
+        private string GetNewName(CRenameItemProperty property)
         {
-            return GetNewName((CodeElement)property, _RuleSet.Property, property.Access);
+            return GetNewName(property.Name, _RuleSet.Property, property.GetElement().Access);
         }
 
-        private static string GetNewName(CodeElement element, SRenameRule[] rules, vsCMAccess access)
+        private static string GetNewName(string name, SRenameRule[] rules, vsCMAccess access)
         {
             switch (access)
             {
                 case vsCMAccess.vsCMAccessPrivate:
-                    return GetNewName(element, rules[Priv]);
+                    return GetNewName(name, rules[Priv]);
                 case vsCMAccess.vsCMAccessProtected:
-                    return GetNewName(element, rules[Prot]);
+                    return GetNewName(name, rules[Prot]);
                 case vsCMAccess.vsCMAccessPublic:
-                    return GetNewName(element, rules[Pub]);
+                    return GetNewName(name, rules[Pub]);
             }
-            Message("Found unknown access modifier for " + element.Name + " " + access);
-            return element.Name;
-        }
-
-        private static string GetNewName(CodeElement element, SRenameRule rule)
-        {
-            return GetNewName(element.Name, rule);
+            Message("Found unknown access modifier for " + name + " " + access);
+            return name;
         }
 
         private static string GetNewName(string theString, SRenameRule rule)
@@ -570,13 +654,13 @@ namespace NamingFix
                     SetNewName(item, _RuleSet.LokalVariable);
             }
             else if (item is CRenameItemVariable)
-                item.NewName = GetNewName(((CRenameItemVariable)item).GetElement());
+                item.NewName = GetNewName((CRenameItemVariable)item);
             else if (item is CRenameItemProperty)
-                item.NewName = GetNewName(((CRenameItemProperty)item).GetElement());
+                item.NewName = GetNewName((CRenameItemProperty)item);
             else if (item is CRenameItemParameter)
                 SetNewName(item, _RuleSet.Parameter);
             else if (item is CRenameItemMethod)
-                item.NewName = GetNewName(((CRenameItemMethod)item).GetElement());
+                item.NewName = GetNewName((CRenameItemMethod)item);
             return true;
             // ReSharper restore CanBeReplacedWithTryCastAndCheckForNull
         }
@@ -597,8 +681,9 @@ namespace NamingFix
             {
                 if (item.Name != item.NewName)
                 {
-                    Message("Renaming " + item.Parent.Name + "." + item.Name);
-                    item.NewName = _TmpPrefix + item.NewName;
+                    _WorkStatus.Text = "Applying changes: " + item.Name;
+                    if (item.GetConflictItem(true) != null)
+                        item.NewName = _TmpPrefix + item.NewName;
                     item.Rename();
                 }
             }
@@ -612,8 +697,17 @@ namespace NamingFix
             if (method != null)
             {
                 method.ReloadText();
-                foreach (CRenameItemLocalVariable localVar in method.LocalVars)
+                //Avoid conflicts by using temporary names
+                foreach (CRenameItemLocalVariable localVar in method.LocalVars.Where(localVar => localVar.Name != localVar.NewName))
+                {
+                    localVar.NewName = _TmpPrefix + localVar.NewName;
                     localVar.Rename();
+                }
+                foreach (CRenameItemLocalVariable localVar in method.LocalVars.Where(localVar => localVar.Name.StartsWith(_TmpPrefix)))
+                {
+                    localVar.NewName = localVar.Name.Substring(_TmpPrefix.Length);
+                    localVar.Rename();
+                }
                 method.ApplyNewText();
             }
             return true;
@@ -647,17 +741,26 @@ namespace NamingFix
         }
         #endregion
 
-        private static bool CheckChanges(CRenameItem item)
+        private bool CheckChanges(CRenameItem item)
         {
             _WorkStatus.SubValue++;
-            CRenameItem conflictItem = item.GetConflictItem();
-            if (conflictItem == null)
+            if (item.Name == item.NewName)
                 return true;
+            CRenameItem conflictItem = null;
+            String msg;
+            if (_ReservedWords.Contains(item.NewName))
+                msg = " as this is a reserved name!";
+            else
+            {
+                conflictItem = item.GetConflictItem(false);
+                if (conflictItem == null)
+                    return true;
+                msg = " as another identifier with the same name already exists or is about to be renamed to the same name!";
+            }
             string name = item.Name;
             AddParentName(ref name, item);
-            Message("Cannot rename " + item.GetTypeName() + " " + name + " to " + item.NewName +
-                    " as another identifier with the same name already exists or is about to be renamed to the same name!");
             Conflicts.Add(new ItemTuple(item, conflictItem));
+            Message("Cannot rename " + item.GetTypeName() + " " + name + " to " + item.NewName + msg);
             return true;
         }
 

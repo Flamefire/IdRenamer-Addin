@@ -23,9 +23,9 @@ namespace NamingFix
 {
     static class CUtils
     {
-        public static void SplitTypeName(string className, out string topClass, out String subClass)
+        public static void SplitTypeName(string className, out string topClass, out String subClass, bool first=true)
         {
-            int p = className.IndexOf('.');
+            int p = (first) ? className.IndexOf('.') : className.LastIndexOf('.');
             if (p >= 0)
             {
                 topClass = className.Substring(0, p);

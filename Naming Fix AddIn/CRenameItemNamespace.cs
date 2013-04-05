@@ -19,7 +19,6 @@
 
 using EnvDTE;
 using System;
-using System.Linq;
 
 namespace NamingFix
 {
@@ -47,7 +46,7 @@ namespace NamingFix
             }
         }
 
-        public override CRenameItem GetConflictItem()
+        public override CRenameItem GetConflictItem(bool swapCheck)
         {
             //Renaming if namespaces is currently not supported!
             return Name == NewName ? null : this;
@@ -69,37 +68,37 @@ namespace NamingFix
             item.IsSystem = IsSystem;
         }
 
-        public CRenameItem GetConflictLocVar(string newName, string oldName)
+        public CRenameItem GetConflictLocVar(string newName, string oldName, bool swapCheck)
         {
-// ReSharper disable LoopCanBeConvertedToQuery
+            // ReSharper disable LoopCanBeConvertedToQuery
             foreach (var cClass in Classes)
-// ReSharper restore LoopCanBeConvertedToQuery
+                // ReSharper restore LoopCanBeConvertedToQuery
             {
-                CRenameItem item = cClass.GetConflictLocVar(newName, oldName);
+                CRenameItem item = cClass.GetConflictLocVar(newName, oldName, swapCheck);
                 if (item != null)
                     return item;
             }
             return null;
         }
 
-        public CRenameItem GetConflictType(string newName, string oldName)
+        public CRenameItem GetConflictType(string newName, string oldName, bool swapCheck)
         {
-            CRenameItem item = Classes.GetConflict(newName, oldName);
+            CRenameItem item = Classes.GetConflict(newName, oldName, swapCheck);
             if (item != null)
                 return item;
-            item = Interfaces.GetConflict(newName, oldName);
+            item = Interfaces.GetConflict(newName, oldName, swapCheck);
             if (item != null)
                 return item;
-            item = Types.GetConflict(newName, oldName);
+            item = Types.GetConflict(newName, oldName, swapCheck);
             if (item != null)
                 return item;
-            item = Namespaces.GetConflict(newName, oldName);
+            item = Namespaces.GetConflict(newName, oldName, swapCheck);
             if (item != null)
                 return item;
-            return (Parent == null) ? null : Parent.GetConflictType(newName, oldName);
+            return (Parent == null) ? null : Parent.GetConflictType(newName, oldName, swapCheck);
         }
 
-        public CRenameItem GetConflictId(string newName, string oldName)
+        public CRenameItem GetConflictId(string newName, string oldName, bool swapCheck)
         {
             //No ids, so no conflicts
             return null;

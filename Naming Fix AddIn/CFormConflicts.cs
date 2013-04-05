@@ -17,7 +17,6 @@
 //  */
 #endregion
 
-using System;
 using System.Windows.Forms;
 
 namespace NamingFix
@@ -38,7 +37,7 @@ namespace NamingFix
             {
                 if (e.Button == MouseButtons.Left)
                     CNamingFix.Conflicts[sel].Item1.Show();
-                else
+                else if (CNamingFix.Conflicts[sel].Item2 != null)
                     CNamingFix.Conflicts[sel].Item2.Show();
             }
             catch
@@ -51,9 +50,7 @@ namespace NamingFix
         {
             int index = lbConflicts.IndexFromPoint(e.Location);
             if (index != ListBox.NoMatches)
-            {
                 lbConflicts.SelectedIndex = index;
-            }
         }
     }
 }

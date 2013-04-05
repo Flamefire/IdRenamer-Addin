@@ -53,29 +53,29 @@ namespace NamingFix
             item.IsSystem = IsSystem;
         }
 
-        public virtual CRenameItem GetConflictLocVar(string newName, string oldName)
+        public virtual CRenameItem GetConflictLocVar(string newName, string oldName, bool swapCheck)
         {
             //No local vars in interfaces
             return null;
         }
 
-        public virtual CRenameItem GetConflictType(string newName, string oldName)
+        public virtual CRenameItem GetConflictType(string newName, string oldName, bool swapCheck)
         {
-            return Parent == null ? null : Parent.GetConflictType(newName, oldName);
+            return Parent == null ? null : Parent.GetConflictType(newName, oldName, swapCheck);
         }
 
-        public virtual CRenameItem GetConflictId(string newName, string oldName)
+        public virtual CRenameItem GetConflictId(string newName, string oldName, bool swapCheck)
         {
-            CRenameItem item = Properties.GetConflict(newName, oldName);
+            CRenameItem item = Properties.GetConflict(newName, oldName, swapCheck);
             if (item != null)
                 return item;
-            item = Methods.GetConflict(newName, oldName);
+            item = Methods.GetConflict(newName, oldName, swapCheck);
             if (item != null)
                 return item;
-            item = Events.GetConflict(newName, oldName);
+            item = Events.GetConflict(newName, oldName, swapCheck);
             if (item != null)
                 return item;
-            return (Parent == null) ? null : Parent.GetConflictId(newName, oldName);
+            return (Parent == null) ? null : Parent.GetConflictId(newName, oldName, swapCheck);
         }
 
         public virtual void CopyIds(CRenameItemInterfaceBase otherItem)
@@ -97,7 +97,7 @@ namespace NamingFix
 
     class CRenameItemInterface : CRenameItemInterfaceBase
     {
-        private readonly CRenameItemInterfaceBase _InheritedStuff = new CRenameItemInterfaceBase();
+        public readonly CRenameItemInterfaceBase InheritedStuff = new CRenameItemInterfaceBase();
         private readonly CRenameItemInterfaceBase _DerivedStuff = new CRenameItemInterfaceBase();
 
         public CodeInterface2 GetElement()
@@ -107,10 +107,10 @@ namespace NamingFix
 
         public override void CopyIds(CRenameItemInterfaceBase otherItem)
         {
-            _InheritedStuff.CopyIds(otherItem);
+            InheritedStuff.CopyIds(otherItem);
             CRenameItemInterface otherItem2 = otherItem as CRenameItemInterface;
             if (otherItem2 != null)
-                _InheritedStuff.CopyIds(otherItem2._InheritedStuff);
+                InheritedStuff.CopyIds(otherItem2.InheritedStuff);
         }
 
         public override void CopyIdsDerived(CRenameItemInterfaceBase otherItem)
@@ -121,31 +121,31 @@ namespace NamingFix
                 _DerivedStuff.CopyIds(otherItem2._DerivedStuff);
         }
 
-        public override CRenameItem GetConflictLocVar(string newName, string oldName)
+        public override CRenameItem GetConflictLocVar(string newName, string oldName, bool swapCheck)
         {
-            CRenameItem item = base.GetConflictLocVar(newName, oldName);
+            CRenameItem item = base.GetConflictLocVar(newName, oldName, swapCheck);
             if (item != null)
                 return item;
-            item = _InheritedStuff.GetConflictLocVar(newName, oldName);
-            return item ?? _DerivedStuff.GetConflictLocVar(newName, oldName);
+            item = InheritedStuff.GetConflictLocVar(newName, oldName, swapCheck);
+            return item ?? _DerivedStuff.GetConflictLocVar(newName, oldName, swapCheck);
         }
 
-        public override CRenameItem GetConflictType(string newName, string oldName)
+        public override CRenameItem GetConflictType(string newName, string oldName, bool swapCheck)
         {
-            CRenameItem item = base.GetConflictType(newName, oldName);
+            CRenameItem item = base.GetConflictType(newName, oldName, swapCheck);
             if (item != null)
                 return item;
-            item = _InheritedStuff.GetConflictType(newName, oldName);
-            return item ?? _DerivedStuff.GetConflictType(newName, oldName);
+            item = InheritedStuff.GetConflictType(newName, oldName, swapCheck);
+            return item ?? _DerivedStuff.GetConflictType(newName, oldName, swapCheck);
         }
 
-        public override CRenameItem GetConflictId(string newName, string oldName)
+        public override CRenameItem GetConflictId(string newName, string oldName, bool swapCheck)
         {
-            CRenameItem item = base.GetConflictId(newName, oldName);
+            CRenameItem item = base.GetConflictId(newName, oldName, swapCheck);
             if (item != null)
                 return item;
-            item = _InheritedStuff.GetConflictId(newName, oldName);
-            return item ?? _DerivedStuff.GetConflictId(newName, oldName);
+            item = InheritedStuff.GetConflictId(newName, oldName, swapCheck);
+            return item ?? _DerivedStuff.GetConflictId(newName, oldName, swapCheck);
         }
     }
 }

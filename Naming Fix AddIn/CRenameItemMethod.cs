@@ -17,11 +17,11 @@
 //  */
 #endregion
 
-using System.Linq;
 using EnvDTE;
 using EnvDTE80;
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Text.RegularExpressions;
 
 namespace NamingFix
@@ -50,8 +50,40 @@ namespace NamingFix
         private static readonly Regex _ReVarbatimString = new Regex("@\"(\"\"|[^\"])*\"", RegexOptions.Compiled | RegexOptions.Multiline);
         private static readonly Regex _ReCommentSl = new Regex(@"//[^\r\n]*\r\n", RegexOptions.Compiled | RegexOptions.Singleline);
         private static readonly Regex _ReCommentMl = new Regex(@"/\*.*?\*/", RegexOptions.Compiled | RegexOptions.Multiline);
+        private string _ExplicitInterfaceName = "";
 
-        public bool IsExtern()
+        public override string Name
+        {
+            set
+            {
+                string mainName, subName;
+                CUtils.SplitTypeName(value, out mainName, out subName, false);
+                if (subName != "")
+                {
+                    _ExplicitInterfaceName = mainName;
+                    mainName = subName;
+                }
+                base.Name = mainName;
+            }
+        }
+
+        public vsCMAccess Access
+        {
+            get { return (_ExplicitInterfaceName != "") ? vsCMAccess.vsCMAccessPublic : GetElement().Access; }
+        }
+
+        public override void Rename()
+        {
+            if (_ExplicitInterfaceName != "")
+            {
+                if (NewName == Name)
+                    return;
+                NewName = _ExplicitInterfaceName + "." + NewName;
+            }
+            base.Rename();
+        }
+
+        private bool IsExtern()
         {
             return GetElement().Attributes.Cast<CodeAttribute>().Any(x => x.Name == "DllImport" || x.Name == "MethodImpl");
         }
@@ -177,28 +209,28 @@ namespace NamingFix
             item.Parent = this;
         }
 
-        public CRenameItem GetConflictLocVar(string newName, string oldName)
+        public CRenameItem GetConflictLocVar(string newName, string oldName, bool swapCheck)
         {
-            CRenameItem item = Parameters.GetConflict(newName, oldName);
-            return item ?? LocalVars.GetConflict(newName, oldName);
+            CRenameItem item = Parameters.GetConflict(newName, oldName, swapCheck);
+            return item ?? LocalVars.GetConflict(newName, oldName, swapCheck);
         }
 
-        public CRenameItem GetConflictType(string newName, string oldName)
+        public CRenameItem GetConflictType(string newName, string oldName, bool swapCheck)
         {
-            return Parent.GetConflictType(newName, oldName);
+            return Parent.GetConflictType(newName, oldName, swapCheck);
         }
 
-        public CRenameItem GetConflictId(string newName, string oldName)
+        public CRenameItem GetConflictId(string newName, string oldName, bool swapCheck)
         {
-            return Parent.GetConflictId(newName, oldName);
+            return Parent.GetConflictId(newName, oldName, swapCheck);
         }
 
-        public override CRenameItem GetConflictItem()
+        public override CRenameItem GetConflictItem(bool swapCheck)
         {
             if (Name == NewName)
                 return null;
-            CRenameItem item = Parent.GetConflictLocVar(NewName, Name);
-            return item ?? Parent.GetConflictId(NewName, Name);
+            CRenameItem item = Parent.GetConflictLocVar(NewName, Name, swapCheck);
+            return item ?? Parent.GetConflictId(NewName, Name, swapCheck);
         }
 
         public CRenameItem FindTypeByName(string typeName)
@@ -213,8 +245,24 @@ namespace NamingFix
             return base.IsRenamingAllowed() &&
                    !IsExtern() &&
                    !Name.StartsWith("~") &&
-                   Name != "this" &&
-                   Name != Parent.Name;
+                   Name != Parent.Name &&
+                   !IsOverrideConflict();
+        }
+
+        private bool IsOverrideConflict()
+        {
+            CRenameItemList<CRenameItemMethod> inheritedMethods;
+            CRenameItemInterface parentInterface = Parent as CRenameItemInterface;
+            if (parentInterface != null)
+                inheritedMethods = parentInterface.InheritedStuff.Methods;
+            else
+            {
+                CRenameItemClass parentClass = Parent as CRenameItemClass;
+                if (parentClass == null)
+                    return false;
+                inheritedMethods = parentClass.InheritedStuff.Methods;
+            }
+            return inheritedMethods.Any(method => method.Name == Name && !method.IsRenamingAllowed());
         }
     }
 }

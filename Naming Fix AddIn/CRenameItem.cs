@@ -17,11 +17,11 @@
 //  */
 #endregion
 
-using System.Text.RegularExpressions;
 using EnvDTE;
 using EnvDTE80;
 using System.Collections.Generic;
 using System.Linq;
+using System.Text.RegularExpressions;
 
 namespace NamingFix
 {
@@ -29,7 +29,7 @@ namespace NamingFix
     {
         public virtual bool IsSystem { get; set; }
         private string _Name;
-        public string Name
+        public virtual string Name
         {
             get { return _Name; }
             set
@@ -50,8 +50,9 @@ namespace NamingFix
         /// Gets one element whose name is conflicting with this one
         /// Or null if no conflict is found 
         /// </summary>
+        /// <param name="swapCheck"></param>
         /// <returns></returns>
-        public abstract CRenameItem GetConflictItem();
+        public abstract CRenameItem GetConflictItem(bool swapCheck);
 
         public string GetTypeName()
         {
@@ -104,9 +105,8 @@ namespace NamingFix
             if (NewName == Name)
                 return;
             CodeElement2 element2 = Element as CodeElement2;
-            if (element2 == null)
-                return;
-            element2.RenameSymbol(NewName);
+            if (element2 != null)
+                element2.RenameSymbol(NewName);
             Name = NewName;
         }
     }
@@ -119,17 +119,17 @@ namespace NamingFix
         /// <summary>
         ///     Checks if given Id collides with local variable
         /// </summary>
-        CRenameItem GetConflictLocVar(string newName, string oldName);
+        CRenameItem GetConflictLocVar(string newName, string oldName, bool swapCheck);
 
         /// <summary>
         ///     Checks if given Id collides with type
         /// </summary>
-        CRenameItem GetConflictType(string newName, string oldName);
+        CRenameItem GetConflictType(string newName, string oldName, bool swapCheck);
 
         /// <summary>
         ///     Checks if given Id collides with Id(Property, Variable, Function)
         /// </summary>
-        CRenameItem GetConflictId(string newName, string oldName);
+        CRenameItem GetConflictId(string newName, string oldName, bool swapCheck);
 
         /// <summary>
         ///     Finds given typename, which is valid in context of current class
@@ -144,8 +144,15 @@ namespace NamingFix
             base.Add((T)item);
         }
 
-        public CRenameItem GetConflict(string newName, string oldName)
+        public CRenameItem GetConflict(string newName, string oldName, bool swapCheck)
         {
+            if (swapCheck)
+            {
+                //Check for an existing item which name is the newName but it should be renamed to something else
+                //-->possible conflict for e.g.:
+                //class x{public int _X;private int X;} <-- needs to be swapped but without this check you'd have 2 values with same name
+                return this.FirstOrDefault(item => item.Name == newName && item.NewName != newName);
+            }
             return this.FirstOrDefault(item => item.NewName == newName && item.Name != oldName);
         }
 
@@ -157,12 +164,12 @@ namespace NamingFix
 
     abstract class CRenameItemVariableBase : CRenameItemElement
     {
-        public override CRenameItem GetConflictItem()
+        public override CRenameItem GetConflictItem(bool swapCheck)
         {
             if (Name == NewName)
                 return null;
-            CRenameItem item = Parent.GetConflictLocVar(NewName, Name);
-            return item ?? Parent.GetConflictId(NewName, Name);
+            CRenameItem item = Parent.GetConflictLocVar(NewName, Name, swapCheck);
+            return item ?? Parent.GetConflictId(NewName, Name, swapCheck);
         }
     }
 
@@ -180,17 +187,21 @@ namespace NamingFix
         {
             return GetElement<CodeProperty2>();
         }
+
+        public override bool IsRenamingAllowed()
+        {
+            return base.IsRenamingAllowed() &&
+                   Name != "this";
+        }
     }
 
     class CRenameItemVariable : CRenameItemParameter {}
 
     class CRenameItemType : CRenameItemElement
     {
-        public override CRenameItem GetConflictItem()
+        public override CRenameItem GetConflictItem(bool swapCheck)
         {
-            if (Name == NewName)
-                return null;
-            return Parent.GetConflictType(NewName, Name);
+            return Name == NewName ? null : Parent.GetConflictType(NewName, Name, swapCheck);
         }
     }
 
