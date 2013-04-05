@@ -550,7 +550,7 @@ namespace NamingFix
         {
             // ReSharper disable CanBeReplacedWithTryCastAndCheckForNull
             _WorkStatus.SubValue++;
-            if (item.IsSystem)
+            if (!item.IsRenamingAllowed())
                 return true;
             if (item is CRenameItemClass)
                 SetNewName(item, _RuleSet.Class);
@@ -575,13 +575,8 @@ namespace NamingFix
                 item.NewName = GetNewName(((CRenameItemProperty)item).GetElement());
             else if (item is CRenameItemParameter)
                 SetNewName(item, _RuleSet.Parameter);
-            else
-            {
-                CRenameItemMethod method = item as CRenameItemMethod;
-                //Just rename methods that are not extern and no constructors/destructors
-                if (method != null && !method.IsExtern() && !method.Name.StartsWith("~") && method.Name != method.Parent.Name)
-                    item.NewName = GetNewName(((CRenameItemMethod)item).GetElement());
-            }
+            else if (item is CRenameItemMethod)
+                item.NewName = GetNewName(((CRenameItemMethod)item).GetElement());
             return true;
             // ReSharper restore CanBeReplacedWithTryCastAndCheckForNull
         }

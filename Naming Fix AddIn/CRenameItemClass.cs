@@ -19,7 +19,6 @@
 
 using EnvDTE80;
 using System;
-using System.Linq;
 
 namespace NamingFix
 {

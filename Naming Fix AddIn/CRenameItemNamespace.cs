@@ -148,5 +148,10 @@ namespace NamingFix
             ns.Element = element;
             return ns;
         }
+
+        public override bool IsRenamingAllowed()
+        {
+            return false;
+        }
     }
 }

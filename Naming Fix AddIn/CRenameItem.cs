@@ -65,6 +65,11 @@ namespace NamingFix
                 ProjectItem.Open(Constants.vsViewKindCode);
             StartPoint.TryToShow(vsPaneShowHow.vsPaneShowTop);
         }
+
+        public virtual bool IsRenamingAllowed()
+        {
+            return !IsSystem;
+        }
     }
 
     abstract class CRenameItemElement : CRenameItem

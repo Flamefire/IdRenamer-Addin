@@ -206,5 +206,15 @@ namespace NamingFix
             //No types in methods
             return Parent.FindTypeByName(typeName);
         }
+
+        public override bool IsRenamingAllowed()
+        {
+            //Just rename methods that are not extern and no constructors/destructors and not "this" (special list id)
+            return base.IsRenamingAllowed() &&
+                   !IsExtern() &&
+                   !Name.StartsWith("~") &&
+                   Name != "this" &&
+                   Name != Parent.Name;
+        }
     }
 }
