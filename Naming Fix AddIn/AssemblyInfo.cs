@@ -70,5 +70,5 @@ using System.Runtime.InteropServices;
 [assembly: AssemblyDelaySign(false)]
 [assembly: AssemblyKeyFile("")]
 [assembly: AssemblyKeyName("")]
-[assembly: AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: ComVisibleAttribute(true)]
+[assembly: AssemblyFileVersion("1.0.0.0")]
+[assembly: ComVisible(true)]

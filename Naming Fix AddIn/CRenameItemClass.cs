@@ -63,7 +63,7 @@ namespace NamingFix
         public override CRenameItem GetConflictLocVar(string newName, string oldName, bool swapCheck)
         {
             // ReSharper disable LoopCanBeConvertedToQuery
-            foreach (var method in Methods)
+            foreach (CRenameItemMethod method in Methods)
                 // ReSharper restore LoopCanBeConvertedToQuery
             {
                 CRenameItem item = method.GetConflictLocVar(newName, oldName, swapCheck);

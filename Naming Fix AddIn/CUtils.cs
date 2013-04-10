@@ -27,7 +27,7 @@ namespace NamingFix
     {
         public static void SplitTypeName(string className, out string topClass, out String subClass, bool first = true)
         {
-            int p = (first) ? className.IndexOf( '.') : className.LastIndexOf('.');
+            int p = (first) ? className.IndexOf('.') : className.LastIndexOf('.');
             if (p >= 0)
             {
                 topClass = className.Substring(0, p);
@@ -66,7 +66,7 @@ namespace NamingFix
                         return codeElement;
                     }
                 }
-                if (element.GetStartPoint(vsCMPart.vsCMPartNavigate).AbsoluteCharOffset!=point.AbsoluteCharOffset)
+                if (element.GetStartPoint(vsCMPart.vsCMPartNavigate).AbsoluteCharOffset != point.AbsoluteCharOffset)
                     continue;
                 return element.Kind == requestedKind ? (CodeElement2)element : null;
             }

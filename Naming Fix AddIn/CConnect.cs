@@ -146,7 +146,7 @@ namespace NamingFix
         }
 
         /// <summary>
-        /// Closes and disposes the <see cref="CConnect"/>
+        ///     Closes and disposes the <see cref="CConnect" />
         /// </summary>
         public void Dispose()
         {
@@ -155,12 +155,16 @@ namespace NamingFix
         }
 
         /// <summary>
-        /// This method is called by <see cref="Dispose()"/>.
-        /// Derived classes can override this method.
+        ///     This method is called by <see cref="Dispose()" />.
+        ///     Derived classes can override this method.
         /// </summary>
         /// <param name="cleanManagedResources">
-        /// <para><see langword="true"/>: Disposes managed and unmanaged resources</para>
-        /// <para><see langword="false"/>: Disposes only unmanaged resources</para>
+        ///     <para>
+        ///         <see langword="true" />: Disposes managed and unmanaged resources
+        ///     </para>
+        ///     <para>
+        ///         <see langword="false" />: Disposes only unmanaged resources
+        ///     </para>
         /// </param>
         private void Dispose(bool cleanManagedResources)
         {

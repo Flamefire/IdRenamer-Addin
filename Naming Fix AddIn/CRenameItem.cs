@@ -47,8 +47,8 @@ namespace NamingFix
         public abstract bool Rename();
 
         /// <summary>
-        /// Gets one element whose name is conflicting with this one
-        /// Or null if no conflict is found 
+        ///     Gets one element whose name is conflicting with this one
+        ///     Or null if no conflict is found
         /// </summary>
         /// <param name="swapCheck"></param>
         /// <returns></returns>

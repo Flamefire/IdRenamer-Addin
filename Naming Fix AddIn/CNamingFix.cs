@@ -255,8 +255,9 @@ namespace NamingFix
             }
             catch (Exception exception)
             {
-                _WorkStatus.Exception = "Exception occured!:\r\n" + exception.Message+"\r\n\r\nIf there have been any changes already applied, revert the whole solution or try to use undo!";
-                Message("Exception Stacktrace: "+exception.StackTrace);
+                _WorkStatus.Exception = "Exception occured!:\r\n" + exception.Message +
+                                        "\r\n\r\nIf there have been any changes already applied, revert the whole solution or try to use undo!";
+                Message("Exception Stacktrace: " + exception.StackTrace);
             }
             _Dte.UndoContext.Close();
         }
@@ -276,7 +277,7 @@ namespace NamingFix
             if (Conflicts.Count == 0)
                 return;
             _FormConflicts.lbConflicts.Items.Clear();
-            foreach (var item in Conflicts)
+            foreach (ItemTuple item in Conflicts)
             {
                 string name = item.Item1.Name;
                 AddParentName(ref name, item.Item1);
@@ -303,7 +304,7 @@ namespace NamingFix
                 if (projectsOut.Any(item => item.UniqueName == project.UniqueName))
                     continue;
                 BuildDependency dependency = dependencies.Item(project);
-                if(dependency!=null)
+                if (dependency != null)
                     AddProjects(((Array)dependency.RequiredProjects).Cast<Project>(), projectsOut, dependencies, ref itemCount);
                 itemCount += project.ProjectItems.Count;
                 projectsOut.Add(project);
@@ -316,23 +317,24 @@ namespace NamingFix
             _WorkStatus.SetText("Analysing project dependecies");
             _RenameItems = new CRenameItemNamespace();
             _SysClassCache.Clear();
-            _WorkStatus.SubMax = _Dte.Solution.Projects.Count+1;
+            _WorkStatus.SubMax = _Dte.Solution.Projects.Count + 1;
             if (_Dte.Solution.Projects.Count == 0)
             {
                 _WorkStatus.Exception = "No Projects to process. Please open one before applying this!";
                 return false;
             }
             List<Project> projects = new List<Project>(_Dte.Solution.Projects.Count);
-            BuildDependencies dependencies=_Dte.Solution.SolutionBuild.BuildDependencies;
+            BuildDependencies dependencies = _Dte.Solution.SolutionBuild.BuildDependencies;
             int itemCount = 0;
             AddProjects(_Dte.Solution.Projects.Cast<Project>(), projects, dependencies, ref itemCount);
             _WorkStatus.SetText("Gathering classes");
-            _WorkStatus.SubMax = itemCount+projects.Count;
+            _WorkStatus.SubMax = itemCount + projects.Count;
             foreach (Project project in projects)
             {
                 IterateProjectItems(project.ProjectItems);
                 _WorkStatus.SubValue++;
-            } return true;
+            }
+            return true;
         }
 
         private void IterateProjectItems(ProjectItems projectItems)
@@ -348,7 +350,7 @@ namespace NamingFix
                     IterateCodeElements(item.FileCodeModel.CodeElements, _RenameItems);
                 }
                 ProjectItems subItems = item.SubProject != null ? item.SubProject.ProjectItems : item.ProjectItems;
-                if (subItems != null && subItems.Count>0)
+                if (subItems != null && subItems.Count > 0)
                 {
                     _WorkStatus.SubMax += subItems.Count;
                     IterateProjectItems(subItems);
@@ -422,7 +424,7 @@ namespace NamingFix
                     cItem.Element = element;
                     cItem.Name = element.Name;
                     curParent.Add(cItem);
-                    if(subElements!=null)
+                    if (subElements != null)
                         IterateCodeElements(subElements, (IRenameItemContainer)cItem);
                 }
                 catch {}
@@ -747,7 +749,6 @@ namespace NamingFix
                     {
                         localVar.NewName = _TmpPrefix + localVar.NewName;
                         localVar.Rename();
-
                     }
                 }
                 foreach (CRenameItemLocalVariable localVar in method.LocalVars.Where(localVar => localVar.Name.StartsWith(_TmpPrefix)))
