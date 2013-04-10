@@ -142,6 +142,8 @@ namespace NamingFix
         public void ApplyNewText()
         {
             String text = Text;
+            if (String.IsNullOrEmpty(text))
+                return;
             RestoreTextComments(ref text);
             _StartPt.ReplaceText(_EndPt, text.Substring(1), (int)vsEPReplaceTextOptions.vsEPReplaceTextKeepMarkers);
         }

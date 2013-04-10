@@ -17,6 +17,7 @@
 //  */
 #endregion
 
+using System;
 using System.Windows.Forms;
 
 namespace NamingFix
@@ -28,5 +29,7 @@ namespace NamingFix
             InitializeComponent();
             Visible = false;
         }
+
+        private void button1_Click(object sender, EventArgs e) {}
     }
 }

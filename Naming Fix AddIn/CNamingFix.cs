@@ -74,6 +74,7 @@ namespace NamingFix
         private static SWorkStatus _WorkStatus;
         private readonly Timer _UpdateTimer = new Timer();
         private bool _IsDisposed;
+        public static bool isAbort;
 
         #region Init
         public CNamingFix(DTE2 dte)
@@ -82,7 +83,7 @@ namespace NamingFix
             _OutputWindow = GetPane("Naming Fix AddIn");
             _OutputWindow.Activate();
             _FormStatus.pbMain.Maximum = _MainStepCount;
-            _UpdateTimer.Interval = 80;
+            _UpdateTimer.Interval = 120;
             _UpdateTimer.Tick += Timer_ShowStatus;
             InitReservedWords();
         }
@@ -198,6 +199,8 @@ namespace NamingFix
             _WorkStatus.Exception = "";
             ShowStatus();
             _FormStatus.Show();
+            _Dte.UndoContext.Open("Item renaming");
+            isAbort = false;
             _WorkerThread = new System.Threading.Thread(Execute);
             _WorkerThread.Start();
             _UpdateTimer.Start();
@@ -207,6 +210,7 @@ namespace NamingFix
         {
             if (!_WorkerThread.IsAlive)
             {
+                _Dte.UndoContext.Close();
                 _FormStatus.Hide();
                 _UpdateTimer.Stop();
                 _WorkerThread = null;
@@ -221,18 +225,21 @@ namespace NamingFix
 
         private void ShowStatus()
         {
-            _FormStatus.pbMain.Value = _WorkStatus.MainValue;
+            // ReSharper disable RedundantCheckBeforeAssignment
+            if (_FormStatus.pbMain.Value != _WorkStatus.MainValue)
+                _FormStatus.pbMain.Value = _WorkStatus.MainValue;
             int value = _WorkStatus.SubValue;
-            _FormStatus.pbSub.Maximum = _WorkStatus.SubMax;
-            if (value <= _FormStatus.pbSub.Maximum)
+            if (_FormStatus.pbSub.Maximum != _WorkStatus.SubMax)
+                _FormStatus.pbSub.Maximum = _WorkStatus.SubMax;
+            if (value <= _FormStatus.pbSub.Maximum && value != _FormStatus.pbSub.Value)
                 _FormStatus.pbSub.Value = value;
             _FormStatus.lblText.Text = _WorkStatus.Text;
+            // ReSharper restore RedundantCheckBeforeAssignment
         }
 
         private void Execute()
         {
             Message("Analysis started!");
-            _Dte.UndoContext.Open("Item renaming");
             try
             {
                 CTypeResolver.AddTypes();
@@ -259,7 +266,6 @@ namespace NamingFix
                                         "\r\n\r\nIf there have been any changes already applied, revert the whole solution or try to use undo!";
                 Message("Exception Stacktrace: " + exception.StackTrace);
             }
-            _Dte.UndoContext.Close();
         }
 
         private static void AddParentName(ref String name, CRenameItem item)
@@ -739,6 +745,8 @@ namespace NamingFix
             CRenameItemMethod method = item as CRenameItemMethod;
             if (method != null)
             {
+                if (method.LocalVars.All(localVar => localVar.Name == localVar.NewName))
+                    return true;
                 method.ReloadText();
                 //Avoid conflicts by using temporary names
                 foreach (CRenameItemLocalVariable localVar in method.LocalVars.Where(localVar => localVar.Name != localVar.NewName))
@@ -747,7 +755,8 @@ namespace NamingFix
                         ShowNotRenamed(localVar);
                     else
                     {
-                        localVar.NewName = _TmpPrefix + localVar.NewName;
+                        if (method.LocalVars.Any(localVariable => localVariable.Name == localVar.NewName))
+                            localVar.NewName = _TmpPrefix + localVar.NewName;
                         localVar.Rename();
                     }
                 }

@@ -48,6 +48,7 @@ namespace NamingFix
             if (nameRe[0] == '@')
                 nameRe = "@?" + nameRe.Substring(1);
             parent.Text = Regex.Replace(parent.Text, @"(?<! new )(?<!\w|\.)" + nameRe + @"(?=( in )|\b(?!\s+[a-zA-Z_]))", NewName, RegexOptions.Singleline);
+            Name = NewName;
             return true;
         }
 
