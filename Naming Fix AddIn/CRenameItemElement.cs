@@ -46,7 +46,7 @@ namespace NamingFix
             }
         }
 
-        public CodeElement2 GetFreshCodeElement()
+        public CodeElement GetFreshCodeElement()
         {
             return (IsSystem || Element == null) ? null : CUtils.GetCodeElementAtTextPoint(_StartPoint, _Kind, _ProjectItem);
         }
@@ -65,20 +65,30 @@ namespace NamingFix
             get { return _StartPoint; }
         }
 
-        public override bool Rename()
+        public bool RefreshElement()
         {
-            if (NewName == Name)
-                return true;
-            CodeElement2 element = GetFreshCodeElement();
+            CodeElement element = GetFreshCodeElement();
             if (element.Name == NewName)
             {
                 Element = element;
                 Name = NewName;
                 return true;
-            } 
+            }
             if (element.Name != _CheckName)
             {
                 CNamingFix.Message("!!!Wrong names: " + element.FullName + "!=" + _CheckName);
+                return false;
+            }
+            Element = element;
+            return true;
+        }
+
+        public override bool Rename()
+        {
+            if (NewName == Name)
+                return true;
+            if (!RefreshElement())
+            {
                 try
                 {
                     if (Element.Name == NewName)
@@ -93,13 +103,9 @@ namespace NamingFix
                     Name = NewName;
                     return true;
                 }
-                element = Element as CodeElement2;
-            }
-            else
-            {
-                Element = element;
             }
 
+            CodeElement2 element = Element as CodeElement2;
             try
             {
                 if (element != null)

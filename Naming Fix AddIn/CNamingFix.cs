@@ -726,14 +726,10 @@ namespace NamingFix
                 if (item.Name != item.NewName)
                 {
                     _WorkStatus.Text = "Applying changes: " + item.Name;
-                    if (item.GetConflictItem(false) == null)
-                    {
-                        if (item.GetConflictItem(true) != null)
-                            item.NewName = _TmpPrefix + item.NewName;
-                        if (item.Rename())
-                            return true;
-                    }
-                    ShowNotRenamed(item);
+                    if (item.GetConflictItem(true) != null)
+                        item.NewName = _TmpPrefix + item.NewName;
+                    if (!item.Rename())
+                        ShowNotRenamed(item);
                 }
             }
             return true;
@@ -747,18 +743,14 @@ namespace NamingFix
             {
                 if (method.LocalVars.All(localVar => localVar.Name == localVar.NewName))
                     return true;
+                _WorkStatus.Text = "Applying local variable names: " + method.Name;
                 method.ReloadText();
                 //Avoid conflicts by using temporary names
                 foreach (CRenameItemLocalVariable localVar in method.LocalVars.Where(localVar => localVar.Name != localVar.NewName))
                 {
-                    if (localVar.GetConflictItem(false) != null)
-                        ShowNotRenamed(localVar);
-                    else
-                    {
-                        if (method.LocalVars.Any(localVariable => localVariable.Name == localVar.NewName))
-                            localVar.NewName = _TmpPrefix + localVar.NewName;
-                        localVar.Rename();
-                    }
+                    if (method.LocalVars.Any(localVariable => localVariable.Name == localVar.NewName))
+                        localVar.NewName = _TmpPrefix + localVar.NewName;
+                    localVar.Rename();
                 }
                 foreach (CRenameItemLocalVariable localVar in method.LocalVars.Where(localVar => localVar.Name.StartsWith(_TmpPrefix)))
                 {
@@ -793,7 +785,9 @@ namespace NamingFix
         {
             _WorkStatus.SetText("Applying changes");
             _WorkStatus.SubMax = _ElCount * 2;
-            if (!TraverseItemContainer(ApplyChangesPre) || !TraverseItemContainer(ApplyChangesLocalVar))
+            if (!TraverseItemContainer(ApplyChangesPre))
+                return;
+            if (!TraverseItemContainer(ApplyChangesLocalVar))
                 return;
             BuildClassTree();
             CountElements();

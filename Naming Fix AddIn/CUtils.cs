@@ -19,7 +19,6 @@
 
 using System;
 using EnvDTE;
-using EnvDTE80;
 
 namespace NamingFix
 {
@@ -40,12 +39,12 @@ namespace NamingFix
             }
         }
 
-        public static CodeElement2 GetCodeElementAtTextPoint(TextPoint point, vsCMElement requestedKind, ProjectItem projectItem)
+        public static CodeElement GetCodeElementAtTextPoint(TextPoint point, vsCMElement requestedKind, ProjectItem projectItem)
         {
             return GetCodeElementAtTextPoint(requestedKind, projectItem.FileCodeModel.CodeElements, point);
         }
 
-        private static CodeElement2 GetCodeElementAtTextPoint(vsCMElement requestedKind, CodeElements codeElements, TextPoint point)
+        private static CodeElement GetCodeElementAtTextPoint(vsCMElement requestedKind, CodeElements codeElements, TextPoint point)
         {
             if (codeElements == null)
                 return null;
@@ -59,7 +58,7 @@ namespace NamingFix
                 CodeElements members = GetCodeElementMembers(element);
                 if (members != null)
                 {
-                    CodeElement2 codeElement = GetCodeElementAtTextPoint(requestedKind, members, point);
+                    CodeElement codeElement = GetCodeElementAtTextPoint(requestedKind, members, point);
                     if (codeElement != null)
                     {
                         // A nested code element also satisfies the conditions
@@ -68,7 +67,7 @@ namespace NamingFix
                 }
                 if (element.GetStartPoint(vsCMPart.vsCMPartNavigate).AbsoluteCharOffset != point.AbsoluteCharOffset)
                     continue;
-                return element.Kind == requestedKind ? (CodeElement2)element : null;
+                return element.Kind == requestedKind ? element : null;
             }
             return null;
         }
