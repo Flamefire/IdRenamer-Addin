@@ -28,7 +28,7 @@ namespace NamingFix
         private vsCMElement _Kind;
         private ProjectItem _ProjectItem;
         private TextPoint _StartPoint;
-        private string _FullName;
+        private string _CheckName;
 
         private CodeElement _Element;
         public CodeElement Element
@@ -42,7 +42,7 @@ namespace NamingFix
                 _Kind = value.Kind;
                 _ProjectItem = value.ProjectItem;
                 _StartPoint = value.GetStartPoint(vsCMPart.vsCMPartNavigate);
-                _FullName = value.FullName;
+                _CheckName = value.Name;
             }
         }
 
@@ -70,17 +70,15 @@ namespace NamingFix
             if (NewName == Name)
                 return true;
             CodeElement2 element = GetFreshCodeElement();
-            if (element.FullName == _FullName)
+            if (Element.Name == NewName)
             {
-                if (Element.Name == NewName)
-                {
-                    Name = NewName;
-                    return true;
-                }
-            }
-            else
+                Element = element;
+                Name = NewName;
+                return true;
+            } 
+            if (element.Name != _CheckName)
             {
-                CNamingFix.Message("!!!Wrong names: " + element.FullName + "!=" + _FullName);
+                CNamingFix.Message("!!!Wrong names: " + element.FullName + "!=" + _CheckName);
                 try
                 {
                     if (Element.Name == NewName)
@@ -96,6 +94,10 @@ namespace NamingFix
                     return true;
                 }
                 element = Element as CodeElement2;
+            }
+            else
+            {
+                Element = element;
             }
 
             try
