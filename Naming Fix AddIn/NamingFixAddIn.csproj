@@ -80,6 +80,7 @@
     <Compile Include="CNamingFix.cs" />
     <Compile Include="CRenameItem.cs" />
     <Compile Include="CRenameItemClass.cs" />
+    <Compile Include="CRenameItemElement.cs" />
     <Compile Include="CRenameItemInterface.cs" />
     <Compile Include="CRenameItemLocalVariable.cs" />
     <Compile Include="CRenameItemMethod.cs" />

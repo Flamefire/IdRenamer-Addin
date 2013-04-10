@@ -29,11 +29,6 @@ namespace NamingFix
         public readonly CRenameItemList<CRenameItemNamespace> Namespaces = new CRenameItemList<CRenameItemNamespace>();
         public readonly CRenameItemList<CRenameItemType> Types = new CRenameItemList<CRenameItemType>();
 
-        public override CodeElement Element
-        {
-            set { InternalElement = value; }
-        }
-
         public override bool IsSystem
         {
             set

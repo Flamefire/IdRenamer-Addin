@@ -69,6 +69,7 @@ namespace NamingFix
         private List<string> _ReservedWords;
         private static int _ElCount;
         private const string _TmpPrefix = "RNFTMPPRE";
+        private const int _MainStepCount = 10;
         private System.Threading.Thread _WorkerThread;
         private static SWorkStatus _WorkStatus;
         private readonly Timer _UpdateTimer = new Timer();
@@ -80,7 +81,7 @@ namespace NamingFix
             _Dte = dte;
             _OutputWindow = GetPane("Naming Fix AddIn");
             _OutputWindow.Activate();
-            _FormStatus.pbMain.Maximum = 9;
+            _FormStatus.pbMain.Maximum = _MainStepCount;
             _UpdateTimer.Interval = 80;
             _UpdateTimer.Tick += Timer_ShowStatus;
             InitReservedWords();
@@ -255,6 +256,7 @@ namespace NamingFix
             catch (Exception exception)
             {
                 _WorkStatus.Exception = "Exception occured!:\r\n" + exception.Message+"\r\n\r\nIf there have been any changes already applied, revert the whole solution or try to use undo!";
+                Message("Exception Stacktrace: "+exception.StackTrace);
             }
             _Dte.UndoContext.Close();
         }
@@ -294,24 +296,43 @@ namespace NamingFix
         }
 
         #region BuildClassTree
+        private void AddProjects(IEnumerable<Project> projectsIn, List<Project> projectsOut, BuildDependencies dependencies, ref int itemCount)
+        {
+            foreach (Project project in projectsIn)
+            {
+                if (projectsOut.Any(item => item.UniqueName == project.UniqueName))
+                    continue;
+                BuildDependency dependency = dependencies.Item(project);
+                if(dependency!=null)
+                    AddProjects(((Array)dependency.RequiredProjects).Cast<Project>(), projectsOut, dependencies, ref itemCount);
+                itemCount += project.ProjectItems.Count;
+                projectsOut.Add(project);
+                _WorkStatus.SubValue++;
+            }
+        }
+
         private bool BuildClassTree()
         {
-            _WorkStatus.SetText("Gathering classes");
+            _WorkStatus.SetText("Analysing project dependecies");
             _RenameItems = new CRenameItemNamespace();
             _SysClassCache.Clear();
-            _WorkStatus.SubMax = _Dte.Solution.Projects.Count * 41;
+            _WorkStatus.SubMax = _Dte.Solution.Projects.Count+1;
             if (_Dte.Solution.Projects.Count == 0)
             {
                 _WorkStatus.Exception = "No Projects to process. Please open one before applying this!";
                 return false;
             }
-            foreach (Project project in _Dte.Solution.Projects)
+            List<Project> projects = new List<Project>(_Dte.Solution.Projects.Count);
+            BuildDependencies dependencies=_Dte.Solution.SolutionBuild.BuildDependencies;
+            int itemCount = 0;
+            AddProjects(_Dte.Solution.Projects.Cast<Project>(), projects, dependencies, ref itemCount);
+            _WorkStatus.SetText("Gathering classes");
+            _WorkStatus.SubMax = itemCount+projects.Count;
+            foreach (Project project in projects)
             {
-                _WorkStatus.SubMax += project.ProjectItems.Count - 40;
                 IterateProjectItems(project.ProjectItems);
                 _WorkStatus.SubValue++;
-            }
-            return true;
+            } return true;
         }
 
         private void IterateProjectItems(ProjectItems projectItems)
@@ -327,7 +348,7 @@ namespace NamingFix
                     IterateCodeElements(item.FileCodeModel.CodeElements, _RenameItems);
                 }
                 ProjectItems subItems = item.SubProject != null ? item.SubProject.ProjectItems : item.ProjectItems;
-                if (subItems != null)
+                if (subItems != null && subItems.Count>0)
                 {
                     _WorkStatus.SubMax += subItems.Count;
                     IterateProjectItems(subItems);
@@ -347,6 +368,7 @@ namespace NamingFix
                 try
                 {
                     CRenameItemElement cItem = null;
+                    CodeElements subElements = null;
                     switch (element.Kind)
                     {
                         case vsCMElement.vsCMElementVariable:
@@ -357,14 +379,14 @@ namespace NamingFix
                             break;
                         case vsCMElement.vsCMElementFunction:
                             cItem = new CRenameItemMethod();
-                            IterateCodeElements(((CodeFunction2)element).Parameters, (IRenameItemContainer)cItem);
+                            subElements = ((CodeFunction2)element).Parameters;
                             break;
                         case vsCMElement.vsCMElementParameter:
                             cItem = new CRenameItemParameter();
                             break;
                         case vsCMElement.vsCMElementInterface:
                             cItem = new CRenameItemInterface();
-                            IterateCodeElements(((CodeInterface2)element).Members, (IRenameItemContainer)cItem);
+                            subElements = ((CodeInterface2)element).Members;
                             break;
                         case vsCMElement.vsCMElementEnum:
                             cItem = new CRenameItemEnum();
@@ -379,7 +401,7 @@ namespace NamingFix
                             break;
                         case vsCMElement.vsCMElementClass:
                             cItem = new CRenameItemClass();
-                            IterateCodeElements(((CodeClass2)element).Members, (IRenameItemContainer)cItem);
+                            subElements = ((CodeClass2)element).Members;
                             break;
                         case vsCMElement.vsCMElementDelegate:
                             cItem = new CRenameItemDelegate();
@@ -396,8 +418,12 @@ namespace NamingFix
                     }
                     if (cItem == null)
                         continue;
+                    cItem.IsSystem = curParent.IsSystem;
                     cItem.Element = element;
+                    cItem.Name = element.Name;
                     curParent.Add(cItem);
+                    if(subElements!=null)
+                        IterateCodeElements(subElements, (IRenameItemContainer)cItem);
                 }
                 catch {}
             }
@@ -497,7 +523,7 @@ namespace NamingFix
                     baseType = (T)tmp;
                 else
                 {
-                    baseType = new T {Element = element, Name = element.Name, IsSystem = true};
+                    baseType = new T {IsSystem = true, Element = element, Name = element.Name};
                     if (element.Kind == vsCMElement.vsCMElementClass)
                         IterateCodeElements(((CodeClass2)element).Members, baseType);
                     else

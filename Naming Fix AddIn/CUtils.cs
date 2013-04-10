@@ -18,14 +18,16 @@
 #endregion
 
 using System;
+using EnvDTE;
+using EnvDTE80;
 
 namespace NamingFix
 {
     static class CUtils
     {
-        public static void SplitTypeName(string className, out string topClass, out String subClass, bool first=true)
+        public static void SplitTypeName(string className, out string topClass, out String subClass, bool first = true)
         {
-            int p = (first) ? className.IndexOf('.') : className.LastIndexOf('.');
+            int p = (first) ? className.IndexOf( '.') : className.LastIndexOf('.');
             if (p >= 0)
             {
                 topClass = className.Substring(0, p);
@@ -36,6 +38,52 @@ namespace NamingFix
                 topClass = className;
                 subClass = "";
             }
+        }
+
+        public static CodeElement2 GetCodeElementAtTextPoint(TextPoint point, vsCMElement requestedKind, ProjectItem projectItem)
+        {
+            return GetCodeElementAtTextPoint(requestedKind, projectItem.FileCodeModel.CodeElements, point);
+        }
+
+        private static CodeElement2 GetCodeElementAtTextPoint(vsCMElement requestedKind, CodeElements codeElements, TextPoint point)
+        {
+            if (codeElements == null)
+                return null;
+            foreach (CodeElement element in codeElements)
+            {
+                if (element.StartPoint.GreaterThan(point) || element.EndPoint.LessThan(point))
+                    continue;
+                // The code element contains the point 
+                // We enter in recursion, just in case there is an inner code element that also 
+                // satisfies the conditions, for example, if we are searching a namespace or a class
+                CodeElements members = GetCodeElementMembers(element);
+                if (members != null)
+                {
+                    CodeElement2 codeElement = GetCodeElementAtTextPoint(requestedKind, members, point);
+                    if (codeElement != null)
+                    {
+                        // A nested code element also satisfies the conditions
+                        return codeElement;
+                    }
+                }
+                if (element.GetStartPoint(vsCMPart.vsCMPartNavigate).AbsoluteCharOffset!=point.AbsoluteCharOffset)
+                    continue;
+                return element.Kind == requestedKind ? (CodeElement2)element : null;
+            }
+            return null;
+        }
+
+        private static CodeElements GetCodeElementMembers(CodeElement objCodeElement)
+        {
+            // ReSharper disable CanBeReplacedWithTryCastAndCheckForNull
+            if (objCodeElement is CodeNamespace)
+                return ((CodeNamespace)objCodeElement).Members;
+            if (objCodeElement is CodeType)
+                return ((CodeType)objCodeElement).Members;
+            if (objCodeElement is CodeFunction)
+                return ((CodeFunction)objCodeElement).Parameters;
+            return null;
+            // ReSharper restore CanBeReplacedWithTryCastAndCheckForNull
         }
     }
 }

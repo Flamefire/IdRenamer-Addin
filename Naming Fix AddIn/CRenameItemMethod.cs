@@ -17,6 +17,7 @@
 //  */
 #endregion
 
+using System.Runtime.InteropServices;
 using EnvDTE;
 using EnvDTE80;
 using System;
@@ -85,7 +86,14 @@ namespace NamingFix
 
         private bool IsExtern()
         {
-            return GetElement().Attributes.Cast<CodeAttribute>().Any(x => x.Name == "DllImport" || x.Name == "MethodImpl");
+            try
+            {
+                return GetElement().Attributes.Cast<CodeAttribute>().Any(x => x.Name == "DllImport" || x.Name == "MethodImpl");
+            }
+            catch (COMException)
+            {
+                return false;
+            }
         }
 
         public override bool IsSystem

@@ -17,7 +17,6 @@
 //  */
 #endregion
 
-using System.Runtime.InteropServices;
 using EnvDTE;
 using EnvDTE80;
 using System.Collections.Generic;
@@ -43,9 +42,9 @@ namespace NamingFix
         public IRenameItemContainer Parent { get; set; }
         public abstract ProjectItem ProjectItem { get; }
         public abstract TextPoint StartPoint { get; }
+        private static readonly Regex _ReCaps = new Regex("(?<=[a-z])[A-Z]", RegexOptions.Compiled);
 
         public abstract bool Rename();
-        private static readonly Regex _ReCaps = new Regex("(?<=[a-z])[A-Z]", RegexOptions.Compiled);
 
         /// <summary>
         /// Gets one element whose name is conflicting with this one
@@ -74,71 +73,10 @@ namespace NamingFix
         }
     }
 
-    abstract class CRenameItemElement : CRenameItem
-    {
-        protected CodeElement InternalElement;
-        public virtual CodeElement Element
-        {
-            private get { return InternalElement; }
-            set
-            {
-                InternalElement = value;
-                Name = value.Name;
-            }
-        }
-
-        protected T GetElement<T>()
-        {
-            return (T)Element;
-        }
-
-        public override ProjectItem ProjectItem
-        {
-            get { return InternalElement.ProjectItem; }
-        }
-        public override TextPoint StartPoint
-        {
-            get { return InternalElement.StartPoint; }
-        }
-
-        public override bool Rename()
-        {
-            if (NewName == Name)
-                return true;
-            try
-            {
-                if (Element.Name == NewName)
-                {
-                    Name = NewName;
-                    return true;
-                }
-            }
-            catch (COMException)
-            {
-                //assume the element has already been changed
-                Name = NewName;
-                return true;
-            }
-            try
-            {
-                CodeElement2 element2 = Element as CodeElement2;
-                if (element2 != null)
-                    element2.RenameSymbol(NewName);
-                Name = NewName;
-                return true;
-            }
-            catch (COMException)
-            {
-                //User aborted renaming
-                NewName = Name;
-                return false;
-            }
-        }
-    }
-
     interface IRenameItemContainer
     {
         string Name { get; }
+        bool IsSystem { get; }
         void Add(CRenameItem item);
 
         /// <summary>
