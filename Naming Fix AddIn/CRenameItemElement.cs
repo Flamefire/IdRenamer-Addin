@@ -70,7 +70,7 @@ namespace NamingFix
             if (NewName == Name)
                 return true;
             CodeElement2 element = GetFreshCodeElement();
-            if (Element.Name == NewName)
+            if (element.Name == NewName)
             {
                 Element = element;
                 Name = NewName;
