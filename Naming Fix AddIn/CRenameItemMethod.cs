@@ -126,7 +126,6 @@ namespace NamingFix
 
         public void ReloadText()
         {
-            RefreshElement();
             CodeFunction2 func = GetElement();
             if (IsSystem || IsExtern() || func.MustImplement)
                 _Text = "";

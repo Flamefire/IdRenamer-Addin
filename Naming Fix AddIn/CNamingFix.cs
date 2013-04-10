@@ -220,7 +220,11 @@ namespace NamingFix
                     ShowConflicts();
             }
             else
+            {
+                if(isAbort)
+                    _WorkerThread.Abort();
                 ShowStatus();
+            }
         }
 
         private void ShowStatus()
@@ -744,6 +748,7 @@ namespace NamingFix
                 if (method.LocalVars.All(localVar => localVar.Name == localVar.NewName))
                     return true;
                 _WorkStatus.Text = "Applying local variable names: " + method.Name;
+                method.RefreshElement();
                 method.ReloadText();
                 //Avoid conflicts by using temporary names
                 foreach (CRenameItemLocalVariable localVar in method.LocalVars.Where(localVar => localVar.Name != localVar.NewName))
