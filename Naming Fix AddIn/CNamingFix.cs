@@ -74,7 +74,8 @@ namespace NamingFix
         private static SWorkStatus _WorkStatus;
         private readonly Timer _UpdateTimer = new Timer();
         private bool _IsDisposed;
-        public static bool isAbort;
+        public static bool IsAbort;
+        private int _ProjectItemCount;
 
         #region Init
         public CNamingFix(DTE2 dte)
@@ -200,7 +201,7 @@ namespace NamingFix
             ShowStatus();
             _FormStatus.Show();
             _Dte.UndoContext.Open("Item renaming");
-            isAbort = false;
+            IsAbort = false;
             _WorkerThread = new System.Threading.Thread(Execute);
             _WorkerThread.Start();
             _UpdateTimer.Start();
@@ -221,7 +222,7 @@ namespace NamingFix
             }
             else
             {
-                if(isAbort)
+                if(IsAbort)
                     _WorkerThread.Abort();
                 ShowStatus();
             }
@@ -268,7 +269,7 @@ namespace NamingFix
             {
                 _WorkStatus.Exception = "Exception occured!:\r\n" + exception.Message +
                                         "\r\n\r\nIf there have been any changes already applied, revert the whole solution or try to use undo!";
-                Message("Exception Stacktrace: " + exception.StackTrace);
+                Message("Exception Stacktrace: " + exception);
             }
         }
 
@@ -335,19 +336,20 @@ namespace NamingFix
             }
             List<Project> projects = new List<Project>(_Dte.Solution.Projects.Count);
             BuildDependencies dependencies = _Dte.Solution.SolutionBuild.BuildDependencies;
-            int itemCount = 0;
-            AddProjects(_Dte.Solution.Projects.Cast<Project>(), projects, dependencies, ref itemCount);
+            AddProjects(_Dte.Solution.Projects.Cast<Project>(), projects, dependencies, ref _ProjectItemCount);
             _WorkStatus.SetText("Gathering classes");
-            _WorkStatus.SubMax = itemCount + projects.Count;
+            _WorkStatus.SubMax = _ProjectItemCount + projects.Count;
             foreach (Project project in projects)
             {
-                IterateProjectItems(project.ProjectItems);
+                IterateProjectItems(project.ProjectItems, ProcessCodeElementsInProjectItem);
                 _WorkStatus.SubValue++;
             }
             return true;
         }
 
-        private void IterateProjectItems(ProjectItems projectItems)
+        private delegate void HandleProjectItem(ProjectItem item);
+
+        private static void IterateProjectItems(ProjectItems projectItems, HandleProjectItem callback)
         {
             foreach (ProjectItem item in projectItems)
             {
@@ -357,20 +359,26 @@ namespace NamingFix
 #if(DEBUG)
                     Message("File " + item.Name + ":");
 #endif
-                    IterateCodeElements(item.FileCodeModel.CodeElements, _RenameItems);
+                    callback(item);
+                    
                 }
                 ProjectItems subItems = item.SubProject != null ? item.SubProject.ProjectItems : item.ProjectItems;
                 if (subItems != null && subItems.Count > 0)
                 {
                     _WorkStatus.SubMax += subItems.Count;
-                    IterateProjectItems(subItems);
+                    IterateProjectItems(subItems, callback);
                 }
                 _WorkStatus.SubValue++;
             }
         }
 
+        private void ProcessCodeElementsInProjectItem(ProjectItem item)
+        {
+            IterateCodeElements(item.FileCodeModel.CodeElements, _RenameItems);
+        }
+
         //Iterate through all the code elements in the provided element
-        private void IterateCodeElements(CodeElements colCodeElements, IRenameItemContainer curParent)
+        private static void IterateCodeElements(CodeElements colCodeElements, IRenameItemContainer curParent)
         {
             //Check for nonmutable object inheritance
             if (colCodeElements == null)
@@ -729,6 +737,9 @@ namespace NamingFix
             {
                 if (item.Name != item.NewName)
                 {
+                    CRenameItemElement itemElement = item as CRenameItemElement;
+                    if (itemElement != null)
+                        itemElement.RefreshElement();
                     _WorkStatus.Text = "Applying changes: " + item.Name;
                     if (item.GetConflictItem(true) != null)
                         item.NewName = _TmpPrefix + item.NewName;
@@ -774,13 +785,15 @@ namespace NamingFix
             {
                 if (item.Name.StartsWith(_TmpPrefix))
                 {
-                    if (item.GetConflictItem(false) != null)
-                        ShowNotRenamed(item);
-                    else
+                    CRenameItemElement itemElement = item as CRenameItemElement;
+                    if (itemElement != null)
                     {
-                        item.NewName = item.Name.Substring(_TmpPrefix.Length);
-                        item.Rename();
+                        itemElement.RefreshElement();
+                        if (!item.Name.StartsWith(_TmpPrefix))
+                            return true;
                     }
+                    item.NewName = item.Name.Substring(_TmpPrefix.Length);
+                    item.Rename();
                 }
             }
             return true;
@@ -794,8 +807,16 @@ namespace NamingFix
                 return;
             if (!TraverseItemContainer(ApplyChangesLocalVar))
                 return;
+
+            /*_WorkStatus.SetText("Applying final changes");
+            _WorkStatus.SubMax = _ProjectItemCount + _Dte.Solution.Projects.Count;
+            foreach (Project project in _Dte.Solution.Projects)
+            {
+                IterateProjectItems(project.ProjectItems, ProcessCodeElementsInProjectItem);
+                _WorkStatus.SubValue++;
+            }
             BuildClassTree();
-            CountElements();
+            CountElements();*/
             _WorkStatus.SetText("Applying final changes");
             _WorkStatus.SubMax = _ElCount;
             TraverseItemContainer(ApplyChangesPost);

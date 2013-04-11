@@ -46,7 +46,7 @@ namespace NamingFix
             }
         }
 
-        public CodeElement GetFreshCodeElement()
+        private CodeElement GetFreshCodeElement()
         {
             return (IsSystem || Element == null) ? null : CUtils.GetCodeElementAtTextPoint(_StartPoint, _Kind, _ProjectItem);
         }
@@ -87,24 +87,6 @@ namespace NamingFix
         {
             if (NewName == Name)
                 return true;
-            if (!RefreshElement())
-            {
-                try
-                {
-                    if (Element.Name == NewName)
-                    {
-                        Name = NewName;
-                        return true;
-                    }
-                }
-                catch (COMException)
-                {
-                    //assume the element has already been changed
-                    Name = NewName;
-                    return true;
-                }
-            }
-
             CodeElement2 element = Element as CodeElement2;
             try
             {

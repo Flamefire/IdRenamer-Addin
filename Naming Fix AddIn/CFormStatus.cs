@@ -32,7 +32,7 @@ namespace NamingFix
 
         private void BtnAbortClick(object sender, EventArgs e)
         {
-            CNamingFix.isAbort = true;
+            CNamingFix.IsAbort = true;
         }
     }
 }
