@@ -258,6 +258,7 @@ namespace NamingFix
                    !_IsExtern() &&
                    !Name.StartsWith("~") &&
                    Name != Parent.Name &&
+                   Name != "Main" &&
                    !_IsOverrideConflict();
         }
 
