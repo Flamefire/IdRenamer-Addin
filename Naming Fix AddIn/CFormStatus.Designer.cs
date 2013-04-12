@@ -101,7 +101,7 @@
             this.btnAbort.TabIndex = 5;
             this.btnAbort.Text = "Abort";
             this.btnAbort.UseVisualStyleBackColor = true;
-            this.btnAbort.Click += new System.EventHandler(this.BtnAbortClick);
+            this.btnAbort.Click += new System.EventHandler(this._BtnAbortClick);
             // 
             // CFormStatus
             // 

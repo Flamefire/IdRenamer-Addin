@@ -18,6 +18,7 @@
 #endregion
 
 using System;
+using System.Collections.Generic;
 
 namespace NamingFix
 {
@@ -31,7 +32,7 @@ namespace NamingFix
 
     struct SRenameRule
     {
-        public bool DontChange;
+        public String DontChangePrefix;
         public String RemovePrefix;
         public String Prefix;
         public ENamingStyle NamingStyle;
@@ -43,6 +44,8 @@ namespace NamingFix
         public const int Prot = 1;
         public const int Pub = 2;
 
+        public readonly List<String> Abbreviations = new List<String>();
+
         public SRenameRule
             Parameter,
             LokalVariable,
@@ -50,8 +53,10 @@ namespace NamingFix
             Interface,
             Class,
             Enum,
+            EnumMember,
             Struct,
-            Event;
+            Event,
+            Delegate;
         public readonly SRenameRule[]
             Const,
             Field,
@@ -80,10 +85,17 @@ namespace NamingFix
             Field[Pub].RemovePrefix = "_";
             Method[Pub].RemovePrefix = "_";
             Property[Pub].RemovePrefix = "_";
+            EnumMember.RemovePrefix = "E";
+            EnumMember.DontChangePrefix = "TR_";
             Interface.Prefix = "I";
             Class.Prefix = "C";
             Enum.Prefix = "E";
             Struct.Prefix = "S";
+
+            Abbreviations.Add("ID");
+            Abbreviations.Add("BG");
+            Abbreviations.Add("XML");
+            Abbreviations.Add("FPS");
         }
     }
 }

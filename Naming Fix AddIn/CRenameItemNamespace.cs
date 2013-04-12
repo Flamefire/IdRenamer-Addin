@@ -19,6 +19,8 @@
 
 using EnvDTE;
 using System;
+using System.Collections;
+using System.Collections.Generic;
 
 namespace NamingFix
 {
@@ -99,7 +101,7 @@ namespace NamingFix
             return null;
         }
 
-        private CRenameItem FindTypeNameDown(String typeName)
+        private CRenameItem _FindTypeNameDown(String typeName)
         {
             string mainType, subType;
             CUtils.SplitTypeName(typeName, out mainType, out subType);
@@ -111,7 +113,7 @@ namespace NamingFix
                 if (itemClass != null)
                     return itemClass.FindTypeNameDown(subType);
                 CRenameItemNamespace ns = Namespaces.Find(mainType);
-                return ns != null ? ns.FindTypeNameDown(subType) : null;
+                return ns != null ? ns._FindTypeNameDown(subType) : null;
             }
             if (itemClass != null)
                 return itemClass;
@@ -121,7 +123,7 @@ namespace NamingFix
 
         public CRenameItem FindTypeByName(string typeName)
         {
-            CRenameItem result = FindTypeNameDown(typeName);
+            CRenameItem result = _FindTypeNameDown(typeName);
             if (result != null)
                 return result;
             return Parent != null ? Parent.FindTypeByName(typeName) : null;
@@ -146,6 +148,11 @@ namespace NamingFix
         public override bool IsRenamingAllowed()
         {
             return false;
+        }
+
+        public IEnumerator GetEnumerator()
+        {
+            return new List<IEnumerable> {Classes, Interfaces, Types, Namespaces}.GetEnumerator();
         }
     }
 }

@@ -19,6 +19,9 @@
 
 using EnvDTE80;
 using System;
+using System.Collections;
+using System.Collections.Generic;
+using System.Linq;
 
 namespace NamingFix
 {
@@ -29,20 +32,8 @@ namespace NamingFix
     {
         public readonly CRenameItemList<CRenameItemClass> Classes = new CRenameItemList<CRenameItemClass>();
         public readonly CRenameItemList<CRenameItemInterface> Interfaces = new CRenameItemList<CRenameItemInterface>();
-        public readonly CRenameItemList<CRenameItemType> Types = new CRenameItemList<CRenameItemType>();
-        public readonly CRenameItemList<CRenameItemVariable> Variables = new CRenameItemList<CRenameItemVariable>();
-
-        public override bool IsSystem
-        {
-            set
-            {
-                base.IsSystem = value;
-                Classes.ForEach(item => item.IsSystem = value);
-                Interfaces.ForEach(item => item.IsSystem = value);
-                Types.ForEach(item => item.IsSystem = value);
-                Variables.ForEach(item => item.IsSystem = value);
-            }
-        }
+        private readonly CRenameItemList<CRenameItemType> _Types = new CRenameItemList<CRenameItemType>();
+        private readonly CRenameItemList<CRenameItemVariable> _Variables = new CRenameItemList<CRenameItemVariable>();
 
         public override void Add(CRenameItem item)
         {
@@ -51,26 +42,29 @@ namespace NamingFix
             else if (item is CRenameItemInterface)
                 Interfaces.Add(item);
             else if (item is CRenameItemType)
-                Types.Add(item);
+                _Types.Add(item);
             else if (item is CRenameItemVariable)
-                Variables.Add(item);
+                _Variables.Add(item);
             else
                 base.Add(item);
             item.Parent = this;
             item.IsSystem = IsSystem;
         }
 
+        protected override List<IEnumerable> _GetEnumeratorList()
+        {
+            List<IEnumerable> result = base._GetEnumeratorList();
+            result.Add(Classes);
+            result.Add(Interfaces);
+            result.Add(_Types);
+            result.Add(_Variables);
+            return result;
+        }
+
         public override CRenameItem GetConflictLocVar(string newName, string oldName, bool swapCheck)
         {
-            // ReSharper disable LoopCanBeConvertedToQuery
-            foreach (CRenameItemMethod method in Methods)
-                // ReSharper restore LoopCanBeConvertedToQuery
-            {
-                CRenameItem item = method.GetConflictLocVar(newName, oldName, swapCheck);
-                if (item != null)
-                    return item;
-            }
-            return null;
+            CRenameItem result = Methods.Select(method => method.GetConflictLocVar(newName, oldName, swapCheck)).FirstOrDefault(item => item != null);
+            return result ?? _Types.Select(type => type.GetConflictLocVar(newName, oldName, swapCheck)).FirstOrDefault(item => item != null);
         }
 
         public override CRenameItem GetConflictType(string newName, string oldName, bool swapCheck)
@@ -81,13 +75,13 @@ namespace NamingFix
             item = Interfaces.GetConflict(newName, oldName, swapCheck);
             if (item != null)
                 return item;
-            item = Types.GetConflict(newName, oldName, swapCheck);
+            item = _Types.GetConflict(newName, oldName, swapCheck);
             return item ?? base.GetConflictType(newName, oldName, swapCheck);
         }
 
         public override CRenameItem GetConflictId(string newName, string oldName, bool swapCheck)
         {
-            CRenameItem item = Variables.GetConflict(newName, oldName, swapCheck);
+            CRenameItem item = _Variables.GetConflict(newName, oldName, swapCheck);
             return item ?? base.GetConflictId(newName, oldName, swapCheck);
         }
 
@@ -97,10 +91,10 @@ namespace NamingFix
             CRenameItemClassBase otherItem2 = otherItem as CRenameItemClassBase;
             if (otherItem2 == null)
                 return;
-            Variables.AddRange(otherItem2.Variables);
+            _Variables.AddRange(otherItem2._Variables);
             Classes.AddRange(otherItem2.Classes);
             Interfaces.AddRange(otherItem2.Interfaces);
-            Types.AddRange(otherItem2.Types);
+            _Types.AddRange(otherItem2._Types);
         }
 
         public CRenameItem FindTypeNameDown(String typeName)
@@ -118,7 +112,7 @@ namespace NamingFix
                 return cClass;
 
             CRenameItem result = Interfaces.Find(mainType);
-            return result ?? Types.Find(mainType);
+            return result ?? _Types.Find(mainType);
         }
 
         public override CRenameItem FindTypeByName(string typeName)
@@ -137,7 +131,7 @@ namespace NamingFix
 
         public CodeClass2 GetElement()
         {
-            return GetElement<CodeClass2>();
+            return _GetElement<CodeClass2>();
         }
 
         public override void CopyIds(CRenameItemInterfaceBase otherItem)

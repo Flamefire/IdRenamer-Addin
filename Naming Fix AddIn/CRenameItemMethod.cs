@@ -17,26 +17,27 @@
 //  */
 #endregion
 
-using System.Runtime.InteropServices;
 using EnvDTE;
 using EnvDTE80;
 using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
+using System.Runtime.InteropServices;
 using System.Text.RegularExpressions;
 
 namespace NamingFix
 {
     class CRenameItemMethod : CRenameItemElement, IRenameItemContainer
     {
-        public readonly CRenameItemList<CRenameItemParameter> Parameters = new CRenameItemList<CRenameItemParameter>();
+        private readonly CRenameItemList<CRenameItemParameter> _Parameters = new CRenameItemList<CRenameItemParameter>();
         private CRenameItemList<CRenameItemLocalVariable> _LocalVars;
         public CRenameItemList<CRenameItemLocalVariable> LocalVars
         {
             get
             {
                 if (_LocalVars == null)
-                    GetLocalVars();
+                    _GetLocalVars();
                 return _LocalVars;
             }
         }
@@ -84,7 +85,7 @@ namespace NamingFix
             return base.Rename();
         }
 
-        private bool IsExtern()
+        private bool _IsExtern()
         {
             try
             {
@@ -101,7 +102,7 @@ namespace NamingFix
             set
             {
                 base.IsSystem = value;
-                Parameters.ForEach(item => item.IsSystem = value);
+                _Parameters.ForEach(item => item.IsSystem = value);
                 if (_LocalVars != null)
                     _LocalVars.ForEach(item => item.IsSystem = value);
             }
@@ -109,7 +110,7 @@ namespace NamingFix
 
         public CodeFunction2 GetElement()
         {
-            return GetElement<CodeFunction2>();
+            return _GetElement<CodeFunction2>();
         }
 
         private String _Text;
@@ -127,14 +128,14 @@ namespace NamingFix
         public void ReloadText()
         {
             CodeFunction2 func = GetElement();
-            if (IsSystem || IsExtern() || func.MustImplement)
+            if (IsSystem || _IsExtern() || func.MustImplement)
                 _Text = "";
             else
             {
                 _StartPt = func.GetStartPoint(vsCMPart.vsCMPartBody).CreateEditPoint();
                 _EndPt = func.GetEndPoint(vsCMPart.vsCMPartBody);
                 String text = "{" + _StartPt.GetText(_EndPt);
-                RemoveTextComments(ref text);
+                _RemoveTextComments(ref text);
                 _Text = text;
             }
         }
@@ -144,11 +145,11 @@ namespace NamingFix
             String text = Text;
             if (String.IsNullOrEmpty(text))
                 return;
-            RestoreTextComments(ref text);
+            _RestoreTextComments(ref text);
             _StartPt.ReplaceText(_EndPt, text.Substring(1), (int)vsEPReplaceTextOptions.vsEPReplaceTextKeepMarkers);
         }
 
-        private void GetLocalVars()
+        private void _GetLocalVars()
         {
             _LocalVars = new CRenameItemList<CRenameItemLocalVariable>();
             MatchCollection locVars = _ReLocVar.Matches(Text);
@@ -164,7 +165,7 @@ namespace NamingFix
                 string name = match.Groups[6].Value;
                 if (type == "return" || type == "else" || type == "in" || type == "out" || type == "ref")
                     continue;
-                if (((CRenameItemInterfaceBase)Parent).FindTypeByName(type) == null && !CNamingFix.FoundTypes.Contains(type))
+                if (Parent.FindTypeByName(type) == null && !CNamingFix.FoundTypes.Contains(type))
                     CNamingFix.FoundTypes.Add(type);
 #if (DEBUG)
                 CNamingFix.Message(name + "\t(" + type + ")");
@@ -174,7 +175,7 @@ namespace NamingFix
             }
         }
 
-        private void RemoveTextComments(ref String text)
+        private void _RemoveTextComments(ref String text)
         {
             _Strings.Clear();
             _Comments.Clear();
@@ -200,7 +201,7 @@ namespace NamingFix
                 });
         }
 
-        private void RestoreTextComments(ref String text)
+        private void _RestoreTextComments(ref String text)
         {
             for (int i = 0; i < _Strings.Count; i++)
                 text = text.Replace("\"ReplacedStr:::" + i + ":::\"", _Strings[i]);
@@ -211,17 +212,18 @@ namespace NamingFix
         public void Add(CRenameItem item)
         {
             if (item is CRenameItemParameter)
-                Parameters.Add(item);
+                _Parameters.Add(item);
             else if (item is CRenameItemLocalVariable)
                 LocalVars.Add(item);
             else
                 throw new ArgumentException();
             item.Parent = this;
+            item.IsSystem = IsSystem;
         }
 
         public CRenameItem GetConflictLocVar(string newName, string oldName, bool swapCheck)
         {
-            CRenameItem item = Parameters.GetConflict(newName, oldName, swapCheck);
+            CRenameItem item = _Parameters.GetConflict(newName, oldName, swapCheck);
             return item ?? LocalVars.GetConflict(newName, oldName, swapCheck);
         }
 
@@ -253,13 +255,13 @@ namespace NamingFix
         {
             //Just rename methods that are not extern and no constructors/destructors and not "this" (special list id)
             return base.IsRenamingAllowed() &&
-                   !IsExtern() &&
+                   !_IsExtern() &&
                    !Name.StartsWith("~") &&
                    Name != Parent.Name &&
-                   !IsOverrideConflict();
+                   !_IsOverrideConflict();
         }
 
-        private bool IsOverrideConflict()
+        private bool _IsOverrideConflict()
         {
             CRenameItemList<CRenameItemMethod> inheritedMethods;
             CRenameItemInterface parentInterface = Parent as CRenameItemInterface;
@@ -273,6 +275,11 @@ namespace NamingFix
                 inheritedMethods = parentClass.InheritedStuff.Methods;
             }
             return inheritedMethods.Any(method => method.Name == Name && !method.IsRenamingAllowed());
+        }
+
+        public IEnumerator GetEnumerator()
+        {
+            return new List<IEnumerable> {_Parameters, LocalVars}.GetEnumerator();
         }
     }
 }

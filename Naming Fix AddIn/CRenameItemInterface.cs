@@ -19,60 +19,52 @@
 
 using EnvDTE80;
 using System;
+using System.Collections;
+using System.Collections.Generic;
 
 namespace NamingFix
 {
-    class CRenameItemInterfaceBase : CRenameItemType, IRenameItemContainer
+    class CRenameItemInterfaceBase : CRenameItemType
     {
         public readonly CRenameItemList<CRenameItemMethod> Methods = new CRenameItemList<CRenameItemMethod>();
-        public readonly CRenameItemList<CRenameItemProperty> Properties = new CRenameItemList<CRenameItemProperty>();
-        public readonly CRenameItemList<CRenameItemEvent> Events = new CRenameItemList<CRenameItemEvent>();
+        private readonly CRenameItemList<CRenameItemProperty> _Properties = new CRenameItemList<CRenameItemProperty>();
+        private readonly CRenameItemList<CRenameItemEvent> _Events = new CRenameItemList<CRenameItemEvent>();
         public bool IsInheritedLoaded;
 
-        public override bool IsSystem
-        {
-            set
-            {
-                base.IsSystem = value;
-                Methods.ForEach(item => item.IsSystem = value);
-                Properties.ForEach(item => item.IsSystem = value);
-            }
-        }
-
-        public virtual void Add(CRenameItem item)
+        public override void Add(CRenameItem item)
         {
             if (item is CRenameItemMethod)
                 Methods.Add(item);
             else if (item is CRenameItemProperty)
-                Properties.Add(item);
+                _Properties.Add(item);
             else if (item is CRenameItemEvent)
-                Events.Add(item);
+                _Events.Add(item);
             else
                 throw new ArgumentException();
             item.Parent = this;
             item.IsSystem = IsSystem;
         }
 
-        public virtual CRenameItem GetConflictLocVar(string newName, string oldName, bool swapCheck)
+        public override CRenameItem GetConflictLocVar(string newName, string oldName, bool swapCheck)
         {
             //No local vars in interfaces
             return null;
         }
 
-        public virtual CRenameItem GetConflictType(string newName, string oldName, bool swapCheck)
+        public override CRenameItem GetConflictType(string newName, string oldName, bool swapCheck)
         {
             return Parent == null ? null : Parent.GetConflictType(newName, oldName, swapCheck);
         }
 
-        public virtual CRenameItem GetConflictId(string newName, string oldName, bool swapCheck)
+        public override CRenameItem GetConflictId(string newName, string oldName, bool swapCheck)
         {
-            CRenameItem item = Properties.GetConflict(newName, oldName, swapCheck);
+            CRenameItem item = _Properties.GetConflict(newName, oldName, swapCheck);
             if (item != null)
                 return item;
             item = Methods.GetConflict(newName, oldName, swapCheck);
             if (item != null)
                 return item;
-            item = Events.GetConflict(newName, oldName, swapCheck);
+            item = _Events.GetConflict(newName, oldName, swapCheck);
             if (item != null)
                 return item;
             return (Parent == null) ? null : Parent.GetConflictId(newName, oldName, swapCheck);
@@ -81,7 +73,8 @@ namespace NamingFix
         public virtual void CopyIds(CRenameItemInterfaceBase otherItem)
         {
             Methods.AddRange(otherItem.Methods);
-            Properties.AddRange(otherItem.Properties);
+            _Properties.AddRange(otherItem._Properties);
+            _Events.AddRange(otherItem._Events);
         }
 
         public virtual void CopyIdsDerived(CRenameItemInterfaceBase otherItem)
@@ -89,9 +82,19 @@ namespace NamingFix
             throw new ArgumentException("Cannot copy derived IDs of base type");
         }
 
-        public virtual CRenameItem FindTypeByName(string typeName)
+        public override CRenameItem FindTypeByName(string typeName)
         {
             return Parent != null ? Parent.FindTypeByName(typeName) : null;
+        }
+
+        protected virtual List<IEnumerable> _GetEnumeratorList()
+        {
+            return new List<IEnumerable> {Methods, _Properties, _Events};
+        }
+
+        public override IEnumerator GetEnumerator()
+        {
+            return _GetEnumeratorList().GetEnumerator();
         }
     }
 
@@ -102,7 +105,7 @@ namespace NamingFix
 
         public CodeInterface2 GetElement()
         {
-            return GetElement<CodeInterface2>();
+            return _GetElement<CodeInterface2>();
         }
 
         public override void CopyIds(CRenameItemInterfaceBase otherItem)

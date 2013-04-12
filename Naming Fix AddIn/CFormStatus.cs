@@ -30,7 +30,7 @@ namespace NamingFix
             Visible = false;
         }
 
-        private void BtnAbortClick(object sender, EventArgs e)
+        private void _BtnAbortClick(object sender, EventArgs e)
         {
             CNamingFix.IsAbort = true;
         }

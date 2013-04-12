@@ -19,6 +19,7 @@
 
 using EnvDTE;
 using EnvDTE80;
+using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text.RegularExpressions;
@@ -73,7 +74,7 @@ namespace NamingFix
         }
     }
 
-    interface IRenameItemContainer
+    interface IRenameItemContainer : IEnumerable
     {
         string Name { get; }
         bool IsSystem { get; }
@@ -136,11 +137,11 @@ namespace NamingFix
         }
     }
 
-    class CRenameItemParameter : CRenameItemVariableBase
+    class CRenameItemVariableElement : CRenameItemVariableBase
     {
         public CodeVariable2 GetElement()
         {
-            return GetElement<CodeVariable2>();
+            return _GetElement<CodeVariable2>();
         }
     }
 
@@ -148,7 +149,7 @@ namespace NamingFix
     {
         public CodeProperty2 GetElement()
         {
-            return GetElement<CodeProperty2>();
+            return _GetElement<CodeProperty2>();
         }
 
         public override bool IsRenamingAllowed()
@@ -158,45 +159,46 @@ namespace NamingFix
         }
     }
 
-    class CRenameItemVariable : CRenameItemParameter {}
+    class CRenameItemParameter : CRenameItemVariableElement {}
 
-    class CRenameItemType : CRenameItemElement
+    class CRenameItemVariable : CRenameItemVariableElement {}
+
+    class CRenameItemEnumMember : CRenameItemVariableElement {}
+
+    abstract class CRenameItemType : CRenameItemElement, IRenameItemContainer
     {
+        public override sealed bool IsSystem
+        {
+            set
+            {
+                base.IsSystem = value;
+                foreach (IEnumerable subItems in this)
+                {
+                    foreach (CRenameItem item in subItems)
+                        item.IsSystem = value;
+                }
+            }
+        }
+
         public override CRenameItem GetConflictItem(bool swapCheck)
         {
             return Name == NewName ? null : Parent.GetConflictType(NewName, Name, swapCheck);
         }
+
+        public abstract void Add(CRenameItem item);
+        public abstract CRenameItem GetConflictLocVar(string newName, string oldName, bool swapCheck);
+        public abstract CRenameItem GetConflictType(string newName, string oldName, bool swapCheck);
+        public abstract CRenameItem GetConflictId(string newName, string oldName, bool swapCheck);
+        public abstract CRenameItem FindTypeByName(string typeName);
+
+        public abstract IEnumerator GetEnumerator();
     }
 
     class CRenameItemEvent : CRenameItemVariableBase
     {
         public CodeEvent GetElement()
         {
-            return GetElement<CodeEvent>();
-        }
-    }
-
-    class CRenameItemEnum : CRenameItemType
-    {
-        public CodeEnum GetElement()
-        {
-            return GetElement<CodeEnum>();
-        }
-    }
-
-    class CRenameItemStruct : CRenameItemType
-    {
-        public CodeStruct GetElement()
-        {
-            return GetElement<CodeStruct>();
-        }
-    }
-
-    class CRenameItemDelegate : CRenameItemType
-    {
-        public CodeDelegate2 GetElement()
-        {
-            return GetElement<CodeDelegate2>();
+            return _GetElement<CodeEvent>();
         }
     }
 }

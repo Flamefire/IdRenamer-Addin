@@ -80,11 +80,14 @@
     <Compile Include="CNamingFix.cs" />
     <Compile Include="CRenameItem.cs" />
     <Compile Include="CRenameItemClass.cs" />
+    <Compile Include="CRenameItemDelegate.cs" />
     <Compile Include="CRenameItemElement.cs" />
+    <Compile Include="CRenameItemEnum.cs" />
     <Compile Include="CRenameItemInterface.cs" />
     <Compile Include="CRenameItemLocalVariable.cs" />
     <Compile Include="CRenameItemMethod.cs" />
     <Compile Include="CRenameItemNamespace.cs" />
+    <Compile Include="CRenameItemStruct.cs" />
     <Compile Include="CRenameRuleSet.cs" />
     <Compile Include="CUtils.cs" />
     <Compile Include="GlobalSuppressions.cs" />

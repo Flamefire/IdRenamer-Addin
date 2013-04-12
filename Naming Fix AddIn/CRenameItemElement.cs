@@ -17,9 +17,9 @@
 //  */
 #endregion
 
-using System.Runtime.InteropServices;
 using EnvDTE;
 using EnvDTE80;
+using System.Runtime.InteropServices;
 
 namespace NamingFix
 {
@@ -46,12 +46,12 @@ namespace NamingFix
             }
         }
 
-        private CodeElement GetFreshCodeElement()
+        private CodeElement _GetFreshCodeElement()
         {
             return (IsSystem || Element == null) ? null : CUtils.GetCodeElementAtTextPoint(_StartPoint, _Kind, _ProjectItem);
         }
 
-        protected T GetElement<T>()
+        protected T _GetElement<T>()
         {
             return (T)Element;
         }
@@ -67,7 +67,7 @@ namespace NamingFix
 
         public bool RefreshElement()
         {
-            CodeElement element = GetFreshCodeElement();
+            CodeElement element = _GetFreshCodeElement();
             if (element.Name == NewName)
             {
                 Element = element;

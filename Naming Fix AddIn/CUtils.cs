@@ -17,8 +17,8 @@
 //  */
 #endregion
 
-using System;
 using EnvDTE;
+using System;
 
 namespace NamingFix
 {
@@ -41,10 +41,10 @@ namespace NamingFix
 
         public static CodeElement GetCodeElementAtTextPoint(TextPoint point, vsCMElement requestedKind, ProjectItem projectItem)
         {
-            return GetCodeElementAtTextPoint(requestedKind, projectItem.FileCodeModel.CodeElements, point);
+            return _GetCodeElementAtTextPoint(requestedKind, projectItem.FileCodeModel.CodeElements, point);
         }
 
-        private static CodeElement GetCodeElementAtTextPoint(vsCMElement requestedKind, CodeElements codeElements, TextPoint point)
+        private static CodeElement _GetCodeElementAtTextPoint(vsCMElement requestedKind, CodeElements codeElements, TextPoint point)
         {
             if (codeElements == null)
                 return null;
@@ -55,10 +55,10 @@ namespace NamingFix
                 // The code element contains the point 
                 // We enter in recursion, just in case there is an inner code element that also 
                 // satisfies the conditions, for example, if we are searching a namespace or a class
-                CodeElements members = GetCodeElementMembers(element);
+                CodeElements members = _GetCodeElementMembers(element);
                 if (members != null)
                 {
-                    CodeElement codeElement = GetCodeElementAtTextPoint(requestedKind, members, point);
+                    CodeElement codeElement = _GetCodeElementAtTextPoint(requestedKind, members, point);
                     if (codeElement != null)
                     {
                         // A nested code element also satisfies the conditions
@@ -72,7 +72,7 @@ namespace NamingFix
             return null;
         }
 
-        private static CodeElements GetCodeElementMembers(CodeElement objCodeElement)
+        private static CodeElements _GetCodeElementMembers(CodeElement objCodeElement)
         {
             // ReSharper disable CanBeReplacedWithTryCastAndCheckForNull
             if (objCodeElement is CodeNamespace)
