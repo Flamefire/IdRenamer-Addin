@@ -158,7 +158,7 @@ namespace NamingFix
 
         ~CConnect()
         {
-            _Dispose(false);
+            Dispose(false);
         }
 
         /// <summary>
@@ -166,7 +166,7 @@ namespace NamingFix
         /// </summary>
         public void Dispose()
         {
-            _Dispose(true);
+            Dispose(true);
             GC.SuppressFinalize(this);
         }
 
@@ -182,7 +182,7 @@ namespace NamingFix
         ///         <see langword="false" />: Disposes only unmanaged resources
         ///     </para>
         /// </param>
-        private void _Dispose(bool cleanManagedResources)
+        protected virtual void Dispose(bool cleanManagedResources)
         {
             if (!_IsDisposed)
             {

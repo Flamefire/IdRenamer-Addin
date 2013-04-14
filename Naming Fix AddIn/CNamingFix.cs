@@ -612,13 +612,15 @@ namespace NamingFix
             if (_RuleSet.FixedNames.Contains(theString))
                 return theString;
 
-            if (_RuleSet.IdStartsWithLetter && !Char.IsLetter(theString, 0))
+            _RemovePrefix(ref theString, rule.Prefix);
+
+            if (theString.Length > 1 && _RuleSet.IdStartsWithLetter && !Char.IsLetter(theString, 0))
             {
                 Message("Stripping non-letter prefix: " + theString);
                 theString = theString.Substring(1);
             }
 
-            if (!_RemovePrefix(ref theString, rule.Prefix) && Char.IsUpper(theString, 1))
+            if (theString.Length > 1 && Char.IsUpper(theString, 1))
             {
                 string prefixStripped = theString.Substring(1);
                 string abbrev = _RuleSet.Abbreviations.FirstOrDefault(ab => theString.StartsWith(ab));
@@ -655,7 +657,7 @@ namespace NamingFix
             return theString;
         }
 
-        private bool _RemovePrefix(ref string theString, string prefix)
+        private static bool _RemovePrefix(ref string theString, string prefix)
         {
             if (string.IsNullOrEmpty(prefix))
                 return false;
