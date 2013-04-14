@@ -49,9 +49,6 @@ namespace NamingFix
             }
         }
 
-        private const int Priv = 0;
-        private const int Prot = 1;
-        private const int Pub = 2;
         private readonly DTE2 _Dte;
         private static OutputWindowPane _OutputWindow;
         private CRenameRuleSet _RuleSet;
@@ -69,13 +66,15 @@ namespace NamingFix
         private List<string> _ReservedWords;
         private static int _ElCount;
         private const string _TmpPrefix = "RNFTMPPRE";
-        private const int _MainStepCount = 10;
+        private const int _MainStepCount = 8;
+        private const int _MainStepCountAnalyze = 6;
         private System.Threading.Thread _WorkerThread;
         private static SWorkStatus _WorkStatus;
         private readonly Timer _UpdateTimer = new Timer();
         private bool _IsDisposed;
         public static bool IsAbort;
         private int _ProjectItemCount;
+        private bool _IsAnalyzeOnly;
 
         #region Init
         public CNamingFix(DTE2 dte)
@@ -83,7 +82,6 @@ namespace NamingFix
             _Dte = dte;
             _OutputWindow = _GetPane("Naming Fix AddIn");
             _OutputWindow.Activate();
-            _FormStatus.pbMain.Maximum = _MainStepCount;
             _UpdateTimer.Interval = 120;
             _UpdateTimer.Tick += Timer_ShowStatus;
             _InitReservedWords();
@@ -185,7 +183,7 @@ namespace NamingFix
         /// <summary>
         ///     This function is used to execute a command when the a menu item is clicked.
         /// </summary>
-        public void DoFix()
+        public void DoFix(bool analyzeOnly)
         {
             if (_WorkerThread != null)
                 return;
@@ -195,12 +193,15 @@ namespace NamingFix
                 "To avoid possible side effects please make sure your solution compiles completely without any errors at all!\r\n\r\nAlso make sure you have a backup or current commit.\r\n\r\nContinue?",
                 "Naming Fix", MessageBoxButtons.YesNo, MessageBoxIcon.Warning) != DialogResult.Yes)
                 return;
+            _IsAnalyzeOnly = analyzeOnly;
+            _FormStatus.pbMain.Maximum = (analyzeOnly) ? _MainStepCountAnalyze : _MainStepCount;
             _WorkStatus.MainValue = 0;
             _WorkStatus.SetText("Initializing", false);
             _WorkStatus.Exception = "";
             _ShowStatus();
             _FormStatus.Show();
-            _Dte.UndoContext.Open("Item renaming");
+            if (!analyzeOnly)
+                _Dte.UndoContext.Open("Item renaming");
             IsAbort = false;
             _WorkerThread = new System.Threading.Thread(_Execute);
             _WorkerThread.Start();
@@ -211,7 +212,8 @@ namespace NamingFix
         {
             if (!_WorkerThread.IsAlive)
             {
-                _Dte.UndoContext.Close();
+                if (!_IsAnalyzeOnly)
+                    _Dte.UndoContext.Close();
                 _FormStatus.Hide();
                 _UpdateTimer.Stop();
                 _WorkerThread = null;
@@ -246,25 +248,25 @@ namespace NamingFix
                 CTypeResolver.AddTypes();
                 FoundTypes.Clear();
                 Conflicts.Clear();
-                if (_BuildClassTree())
-                {
-                    _CountElements();
-                    _GetInheritanceInfo();
-                    _RuleSet = new CRenameRuleSet();
-                    _SetNewNames();
-                    if (_CheckChanges() && Conflicts.Count == 0)
-                        _ApplyChanges();
+                if (!_BuildClassTree())
+                    return;
+                _CountElements();
+                _GetInheritanceInfo();
+                _RuleSet = new CRenameRuleSet();
+                _SetNewNames();
+                if (_CheckChanges() && !_IsAnalyzeOnly && Conflicts.Count == 0)
+                    _ApplyChanges();
 
-                    Message("\r\nFound local var types:");
-                    foreach (string type in FoundTypes.Where(type => !CTypeResolver.IsType(type)))
-                        Message(type);
-                    Message("IMPORTANT: Check if all found types above are actual types otherwhise use undo and fix addin!");
-                }
+                Message("\r\nFound local var types:");
+                foreach (string type in FoundTypes.Where(type => !CTypeResolver.IsType(type)))
+                    Message(type);
+                Message("IMPORTANT: Check if all found types above are actual types otherwhise use undo and fix addin!");
             }
             catch (Exception exception)
             {
-                _WorkStatus.Exception = "Exception occured!:\r\n" + exception.Message +
-                                        "\r\n\r\nIf there have been any changes already applied, revert the whole solution or try to use undo!";
+                _WorkStatus.Exception = "Exception occured!:\r\n" + exception.Message;
+                if (!_IsAnalyzeOnly)
+                    _WorkStatus.Exception += "\r\n\r\nIf there have been any changes already applied, revert the whole solution or try to use undo!";
                 Message("Exception Stacktrace: " + exception);
             }
         }
@@ -592,11 +594,11 @@ namespace NamingFix
             switch (access)
             {
                 case vsCMAccess.vsCMAccessPrivate:
-                    return _GetNewName(name, rules[Priv]);
+                    return _GetNewName(name, rules[CRenameRuleSet.Priv]);
                 case vsCMAccess.vsCMAccessProtected:
-                    return _GetNewName(name, rules[Prot]);
+                    return _GetNewName(name, rules[CRenameRuleSet.Prot]);
                 case vsCMAccess.vsCMAccessPublic:
-                    return _GetNewName(name, rules[Pub]);
+                    return _GetNewName(name, rules[CRenameRuleSet.Pub]);
             }
             Message("Found unknown access modifier for " + name + " " + access);
             return name;
@@ -607,14 +609,33 @@ namespace NamingFix
             if (!String.IsNullOrEmpty(rule.DontChangePrefix) && theString.StartsWith(rule.DontChangePrefix))
                 return theString;
 
-            _RemovePrefix(ref theString, rule.RemovePrefix);
-            _RemovePrefix(ref theString, rule.Prefix);
+            if (_RuleSet.FixedNames.Contains(theString))
+                return theString;
+
+            if (_RuleSet.IdStartsWithLetter && !Char.IsLetter(theString, 0))
+            {
+                Message("Stripping non-letter prefix: " + theString);
+                theString = theString.Substring(1);
+            }
+
+            if (!_RemovePrefix(ref theString, rule.Prefix) && Char.IsUpper(theString, 1))
+            {
+                string prefixStripped = theString.Substring(1);
+                string abbrev = _RuleSet.Abbreviations.FirstOrDefault(ab => theString.StartsWith(ab));
+                string checkString = (abbrev == null) ? prefixStripped : prefixStripped.Substring(abbrev.Length);
+                bool isUpper = checkString.Length == 0 || !checkString.Any(Char.IsLower);
+                if (!isUpper)
+                {
+                    Message("Stripping prefix: " + theString + " -> " + prefixStripped);
+                    theString = prefixStripped;
+                }
+            }
 
             switch (rule.NamingStyle)
             {
                 case
                     ENamingStyle.LowerCamelCase:
-                    if (rule.Prefix != null && Char.IsLower(rule.Prefix[rule.Prefix.Length - 1]))
+                    if (rule.Prefix != null && Char.IsLower(rule.Prefix, rule.Prefix.Length - 1))
                         _ToUpperCamelCase(ref theString);
                     else
                         _ToLowerCamelCase(ref theString);
@@ -634,17 +655,21 @@ namespace NamingFix
             return theString;
         }
 
-        private static void _RemovePrefix(ref string theString, string prefix)
+        private bool _RemovePrefix(ref string theString, string prefix)
         {
             if (string.IsNullOrEmpty(prefix))
-                return;
+                return false;
             if (theString.Length <= prefix.Length || !theString.StartsWith(prefix))
-                return;
+                return false;
             //Do not remove if prexix ends with a capital and next char is no capital
             //So remove if prefix ends with anything but a capital or next char in string is a capital
             //In that case it is likely that the prefix is part of the name. e.g. prefix "C" and name "class CodeBook"
-            if (!Char.IsUpper(prefix[prefix.Length - 1]) || Char.IsUpper(theString[prefix.Length]))
+            if (!Char.IsUpper(prefix, prefix.Length - 1) || Char.IsUpper(theString, prefix.Length))
+            {
                 theString = theString.Remove(0, prefix.Length);
+                return true;
+            }
+            return false;
         }
 
         private void _ToLowerCamelCase(ref String theString)
@@ -661,11 +686,13 @@ namespace NamingFix
 
         private void _ToCamelCase(ref String theString)
         {
+            string input = theString;
             theString = theString.Replace("__", "_");
             theString = _ReMultiCaps.Replace(theString, m =>
                 {
                     if (_RuleSet.Abbreviations.Any(abbrev => abbrev.StartsWith(m.Value)))
                         return m.Value;
+                    Message("Possible abbreviation: " + m.Value + " in " + input);
                     return m.Value[0] + m.Value.Substring(1).ToLower();
                 });
             theString = _ReUnderScore.Replace(theString, m => m.Value[1].ToString().ToUpper());
@@ -820,16 +847,6 @@ namespace NamingFix
                 return;
             if (!_TraverseItemContainer(_ApplyChangesLocalVar))
                 return;
-
-            /*_WorkStatus.SetText("Applying final changes");
-            _WorkStatus.SubMax = _ProjectItemCount + _Dte.Solution.Projects.Count;
-            foreach (Project project in _Dte.Solution.Projects)
-            {
-                IterateProjectItems(project.ProjectItems, ProcessCodeElementsInProjectItem);
-                _WorkStatus.SubValue++;
-            }
-            BuildClassTree();
-            CountElements();*/
             _WorkStatus.SetText("Applying final changes");
             _WorkStatus.SubMax = _ElCount;
             _TraverseItemContainer(_ApplyChangesPost);

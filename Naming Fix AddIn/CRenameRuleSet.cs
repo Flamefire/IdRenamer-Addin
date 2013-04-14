@@ -33,7 +33,6 @@ namespace NamingFix
     struct SRenameRule
     {
         public String DontChangePrefix;
-        public String RemovePrefix;
         public String Prefix;
         public ENamingStyle NamingStyle;
     }
@@ -45,6 +44,9 @@ namespace NamingFix
         public const int Pub = 2;
 
         public readonly List<String> Abbreviations = new List<String>();
+        public readonly List<String> FixedNames = new List<String>();
+
+        public bool IdStartsWithLetter;
 
         public SRenameRule
             Parameter,
@@ -81,21 +83,21 @@ namespace NamingFix
             Field[Prot].Prefix = "_";
             Method[Prot].Prefix = "_";
             Property[Prot].Prefix = "_";
-            Const[Pub].RemovePrefix = "_";
-            Field[Pub].RemovePrefix = "_";
-            Method[Pub].RemovePrefix = "_";
-            Property[Pub].RemovePrefix = "_";
-            EnumMember.RemovePrefix = "E";
             EnumMember.DontChangePrefix = "TR_";
             Interface.Prefix = "I";
             Class.Prefix = "C";
             Enum.Prefix = "E";
             Struct.Prefix = "S";
 
+            IdStartsWithLetter = true;
+
             Abbreviations.Add("ID");
             Abbreviations.Add("BG");
             Abbreviations.Add("XML");
             Abbreviations.Add("FPS");
+
+            FixedNames.Add("x86");
+            FixedNames.Add("x64");
         }
     }
 }

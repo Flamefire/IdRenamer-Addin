@@ -32,6 +32,7 @@ namespace NamingFix
         // ReSharper restore UnusedMember.Global
     {
         private const string _ExecCmdName = "Exec";
+        private const string _AnalyzeCmdName = "Analyze";
         private CNamingFix _Fixer;
 
         /// <summary>Implementiert die OnConnection-Methode der IDTExtensibility2-Schnittstelle. Empfängt eine Benachrichtigung, wenn das Add-In geladen wird.</summary>
@@ -59,22 +60,30 @@ namespace NamingFix
             CommandBarControl toolsControl = menuBarCommandBar.Controls[toolsMenuName];
             CommandBarPopup toolsPopup = (CommandBarPopup)toolsControl;
 
-            //Dieser try/catch-Block kann dupliziert werden, wenn Sie mehrere Befehle hinzufügen möchten, die von dem Add-In verarbeitet werden sollen.
-            //  Sie müssen nur sicherstellen, dass Sie auch die QueryStatus/Exec-Methode aktualisieren, um die neuen Befehlsnamen einzuschließen.
+            // Try/Catch for each command
+            // Update QueryStatus/Exec-Methode for new commands!
             try
             {
-                //Fügen Sie der Befehlsauflistung einen Befehl hinzu:
-                Command command = commands.AddNamedCommand2(_AddInInstance, _ExecCmdName, "Apply namesheme", "Starts the analysis", true, 0940, ref contextGuids);
+                Command command = commands.AddNamedCommand2(_AddInInstance, _ExecCmdName, "Apply namesheme", "Analyzes and applies changes", true, 0940, ref contextGuids);
 
-                //Fügen Sie dem Menü "Tools" ein Steuerelement für den Befehl hinzu:
                 if ((command != null) && (toolsPopup != null))
                     command.AddControl(toolsPopup.CommandBar);
             }
             catch (ArgumentException)
             {
-                //An dieser Stelle tritt die Ausnahme wahrscheinlich auf, weil bereits ein Befehl mit diesem Namen
-                //  vorhanden ist. Ist dies der Fall, muss der Befehl nicht erneut erstellt werden, und 
-                //  die Ausnahme kann sicher ignoriert werden.
+                // Command exists. All OK!
+            }
+            try
+            {
+                Command command = commands.AddNamedCommand2(_AddInInstance, _AnalyzeCmdName, "Analyze namesheme", "Starts the analysis (NO changes done)", true, 0941,
+                                                            ref contextGuids);
+
+                if ((command != null) && (toolsPopup != null))
+                    command.AddControl(toolsPopup.CommandBar);
+            }
+            catch (ArgumentException)
+            {
+                // Command exists. All OK!
             }
         }
 
@@ -109,7 +118,7 @@ namespace NamingFix
         {
             if (neededText != vsCommandStatusTextWanted.vsCommandStatusTextWantedNone)
                 return;
-            if (commandName == GetType().FullName + "." + _ExecCmdName)
+            if (commandName == GetType().FullName + "." + _ExecCmdName || commandName == GetType().FullName + "." + _AnalyzeCmdName)
                 // ReSharper disable BitwiseOperatorOnEnumWithoutFlags
                 status = vsCommandStatus.vsCommandStatusSupported | vsCommandStatus.vsCommandStatusEnabled;
             // ReSharper restore BitwiseOperatorOnEnumWithoutFlags
@@ -127,11 +136,18 @@ namespace NamingFix
             if (handled)
                 return;
             handled = false;
-            if (executeOption != vsCommandExecOption.vsCommandExecOptionDoDefault
-                || commandName != GetType().FullName + "." + _ExecCmdName)
+            if (executeOption != vsCommandExecOption.vsCommandExecOptionDoDefault)
                 return;
-            _Fixer.DoFix();
-            handled = true;
+            if (commandName == GetType().FullName + "." + _ExecCmdName)
+            {
+                _Fixer.DoFix(false);
+                handled = true;
+            }
+            else if (commandName == GetType().FullName + "." + _AnalyzeCmdName)
+            {
+                _Fixer.DoFix(true);
+                handled = true;
+            }
         }
 
         private DTE2 _ApplicationObject;
