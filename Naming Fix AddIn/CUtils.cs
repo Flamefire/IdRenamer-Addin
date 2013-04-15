@@ -77,12 +77,13 @@ namespace NamingFix
             // ReSharper disable CanBeReplacedWithTryCastAndCheckForNull
             if (objCodeElement is CodeNamespace)
                 return ((CodeNamespace)objCodeElement).Members;
+            //Check for delegate before type as delegates only have parameters no members!
+            if (objCodeElement is CodeDelegate)
+                return ((CodeDelegate)objCodeElement).Parameters;
             if (objCodeElement is CodeType)
                 return ((CodeType)objCodeElement).Members;
             if (objCodeElement is CodeFunction)
                 return ((CodeFunction)objCodeElement).Parameters;
-            if (objCodeElement is CodeDelegate)
-                return ((CodeDelegate)objCodeElement).Parameters;
             return null;
             // ReSharper restore CanBeReplacedWithTryCastAndCheckForNull
         }
