@@ -44,9 +44,11 @@ namespace NamingFix
         public const int Pub = 2;
 
         public readonly List<String> Abbreviations = new List<String>();
+        public readonly List<String> PartialAbbreviations = new List<String>();
         public readonly List<String> FixedNames = new List<String>();
 
-        public bool IdStartsWithLetter;
+        public readonly bool IdStartsWithLetter;
+        public readonly string RemoveNonLetterPrefixNoReport = "_";
 
         public SRenameRule
             Parameter,
@@ -93,11 +95,64 @@ namespace NamingFix
 
             Abbreviations.Add("ID");
             Abbreviations.Add("BG");
+            Abbreviations.Add("FG");
             Abbreviations.Add("XML");
             Abbreviations.Add("FPS");
+            Abbreviations.Add("BPM");
+            Abbreviations.Add("LB");
+            Abbreviations.Add("RB");
+            Abbreviations.Add("MB");
+            Abbreviations.Add("LD");
+            Abbreviations.Add("DB");
+            Abbreviations.Add("AA");
+            Abbreviations.Add("DX");
+            Abbreviations.Add("DY");
+            Abbreviations.Add("RC");
+            Abbreviations.Add("USDX");
+            Abbreviations.Add("LED");
+            Abbreviations.Add("PID");
+            Abbreviations.Add("VID");
+            Abbreviations.Add("IR");
+            Abbreviations.Add("RGB");
+            Abbreviations.Add("BGR");
+            Abbreviations.Add("IO");
+            Abbreviations.Add("API");
+            Abbreviations.Add("HID");
+            Abbreviations.Add("PBO");
+            //Audio stuff
+            Abbreviations.Add("MME");
+            Abbreviations.Add("ASIO");
+            Abbreviations.Add("OSS");
+            Abbreviations.Add("ALSA");
+            Abbreviations.Add("OS");
+            Abbreviations.Add("WDMKS");
+            Abbreviations.Add("JACK");
+            Abbreviations.Add("WASAPI");
+            Abbreviations.Add("HPI");
+            Abbreviations.Add("AC");
+
+            Abbreviations.Add("PA"); //PortAudio
+            Abbreviations.Add("AL"); //OpenAL
+            Abbreviations.Add("GL"); //OpenGL
+            Abbreviations.Add("CV"); //OpenCV
+
+            PartialAbbreviations.Add("MP3");
+            PartialAbbreviations.Add("ZValue");
+            PartialAbbreviations.Add("ZFar");
+            PartialAbbreviations.Add("ZNear");
+            PartialAbbreviations.Add("ZSort");
+            PartialAbbreviations.Add("ZOffset");
+            PartialAbbreviations.Add("HAlign");
+            PartialAbbreviations.Add("VAlign");
+            PartialAbbreviations.Add("AForgeNet");
+            PartialAbbreviations.Add("FFmpeg");
+            PartialAbbreviations.Add("VSync");
+            PartialAbbreviations.Add("UInt");
+            PartialAbbreviations.Add("UTF8");
 
             FixedNames.Add("x86");
             FixedNames.Add("x64");
+            FixedNames.Add("D3DTextures");
         }
     }
 }

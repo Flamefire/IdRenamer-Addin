@@ -17,6 +17,7 @@
 //  */
 #endregion
 
+using System;
 using EnvDTE;
 using EnvDTE80;
 using System.Runtime.InteropServices;
@@ -68,6 +69,12 @@ namespace NamingFix
         public bool RefreshElement()
         {
             CodeElement element = _GetFreshCodeElement();
+            if (element == null)
+            {
+                string name = Name;
+                CUtils.AddParentName(ref name, this);
+                throw new Exception("Could not get fresh element for " + Name);
+            }
             if (element.Name == NewName)
             {
                 Element = element;

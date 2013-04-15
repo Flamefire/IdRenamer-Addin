@@ -30,6 +30,7 @@ using System.Windows.Forms;
 namespace NamingFix
 {
     using ItemTuple = Tuple<CRenameItem, CRenameItem>;
+    using ItemStringTuple = Tuple<CRenameItem, String>;
 
     class CNamingFix : IDisposable
     {
@@ -61,8 +62,10 @@ namespace NamingFix
         public static readonly List<String> FoundTypes = new List<string>();
 
         private readonly CFormStatus _FormStatus = new CFormStatus();
-        private readonly CFormConflicts _FormConflicts = new CFormConflicts();
+        private static readonly CFormConflicts _FormConflicts = new CFormConflicts();
+        private static readonly CFormRemarks _FormRemarks = new CFormRemarks();
         public static readonly List<ItemTuple> Conflicts = new List<ItemTuple>();
+        public static readonly List<ItemStringTuple> Remarks = new List<ItemStringTuple>();
         private List<string> _ReservedWords;
         private static int _ElCount;
         private const string _TmpPrefix = "RNFTMPPRE";
@@ -189,19 +192,28 @@ namespace NamingFix
                 return;
             _OutputWindow.Clear();
             _FormConflicts.Hide();
+            _FormRemarks.Hide();
             if (MessageBox.Show(
                 "To avoid possible side effects please make sure your solution compiles completely without any errors at all!\r\n\r\nAlso make sure you have a backup or current commit.\r\n\r\nContinue?",
                 "Naming Fix", MessageBoxButtons.YesNo, MessageBoxIcon.Warning) != DialogResult.Yes)
                 return;
             _IsAnalyzeOnly = analyzeOnly;
-            _FormStatus.pbMain.Maximum = (analyzeOnly) ? _MainStepCountAnalyze : _MainStepCount;
+            if (analyzeOnly)
+            {
+                _FormStatus.lblAction.Text = "Analyzing namings. Check Outputpanel for remarks!";
+                _FormStatus.pbMain.Maximum = _MainStepCountAnalyze;
+            }
+            else
+            {
+                _FormStatus.lblAction.Text = "Applying given name sheme";
+                _FormStatus.pbMain.Maximum = _MainStepCount;
+                _Dte.UndoContext.Open("Item renaming");
+            }
             _WorkStatus.MainValue = 0;
             _WorkStatus.SetText("Initializing", false);
             _WorkStatus.Exception = "";
             _ShowStatus();
             _FormStatus.Show();
-            if (!analyzeOnly)
-                _Dte.UndoContext.Open("Item renaming");
             IsAbort = false;
             _WorkerThread = new System.Threading.Thread(_Execute);
             _WorkerThread.Start();
@@ -220,7 +232,16 @@ namespace NamingFix
                 if (_WorkStatus.Exception != "")
                     MessageBox.Show(_WorkStatus.Exception, "Exception occured", MessageBoxButtons.OK, MessageBoxIcon.Error);
                 else
+                {
                     _ShowConflicts();
+                    _ShowRemarks();
+                    _FormRemarks.Left = Screen.PrimaryScreen.WorkingArea.Width - _FormRemarks.Width;
+                    _FormRemarks.Top = 0;
+                    _FormConflicts.Left = Screen.PrimaryScreen.WorkingArea.Width - _FormConflicts.Width;
+                    _FormConflicts.Top = _FormRemarks.Top + _FormRemarks.Height;
+                    if (_FormConflicts.Top > Screen.PrimaryScreen.WorkingArea.Height - 200)
+                        _FormConflicts.Top = Screen.PrimaryScreen.WorkingArea.Height - 200;
+                }
             }
             else
             {
@@ -248,12 +269,14 @@ namespace NamingFix
                 CTypeResolver.AddTypes();
                 FoundTypes.Clear();
                 Conflicts.Clear();
+                Remarks.Clear();
                 if (!_BuildClassTree())
                     return;
                 _CountElements();
                 _GetInheritanceInfo();
                 _RuleSet = new CRenameRuleSet();
                 _SetNewNames();
+                Message("Analysis finished!");
                 if (_CheckChanges() && !_IsAnalyzeOnly && Conflicts.Count == 0)
                     _ApplyChanges();
 
@@ -269,19 +292,10 @@ namespace NamingFix
                     _WorkStatus.Exception += "\r\n\r\nIf there have been any changes already applied, revert the whole solution or try to use undo!";
                 Message("Exception Stacktrace: " + exception);
             }
+            Message("Processing finished!");
         }
 
-        private static void _AddParentName(ref String name, CRenameItem item)
-        {
-            if (string.IsNullOrEmpty(item.Parent.Name))
-                return;
-            if (item.Parent is CRenameItemType || item.Parent is CRenameItemNamespace)
-                name = item.Parent.Name + "." + name;
-            else
-                name += " in " + item.Parent.Name;
-        }
-
-        private void _ShowConflicts()
+        private static void _ShowConflicts()
         {
             if (Conflicts.Count == 0)
                 return;
@@ -289,13 +303,13 @@ namespace NamingFix
             foreach (ItemTuple item in Conflicts)
             {
                 string name = item.Item1.Name;
-                _AddParentName(ref name, item.Item1);
+                CUtils.AddParentName(ref name, item.Item1);
                 string description;
                 if (item.Item2 != null)
                 {
                     string name2 = item.Item2.Name;
                     if (item.Item1.Parent.Name != item.Item2.Parent.Name)
-                        _AddParentName(ref name2, item.Item2);
+                        CUtils.AddParentName(ref name2, item.Item2);
                     description = " <=> " + item.Item2.GetTypeName() + " " + name2;
                 }
                 else
@@ -303,6 +317,17 @@ namespace NamingFix
                 _FormConflicts.lbConflicts.Items.Add(item.Item1.GetTypeName() + " " + name + " --> " + item.Item1.NewName + description);
             }
             _FormConflicts.Show();
+        }
+
+        private static void _ShowRemarks()
+        {
+            if (Remarks.Count == 0)
+                return;
+            Remarks.Sort((item1, item2) => String.Compare(item1.Item2, item2.Item2, StringComparison.Ordinal));
+            _FormRemarks.lbRemarks.Items.Clear();
+            foreach (ItemStringTuple item in Remarks)
+                _FormRemarks.lbRemarks.Items.Add(item.Item2);
+            _FormRemarks.Show();
         }
 
         #region BuildClassTree
@@ -423,6 +448,7 @@ namespace NamingFix
                             break;
                         case vsCMElement.vsCMElementDelegate:
                             cItem = new CRenameItemDelegate();
+                            subElements = ((CodeDelegate2)element).Parameters;
                             break;
                         case vsCMElement.vsCMElementEvent:
                             cItem = new CRenameItemEvent();
@@ -431,7 +457,7 @@ namespace NamingFix
                         case vsCMElement.vsCMElementAttribute:
                             break;
                         default:
-                            Message("Unhandled element kind: " + element.Kind.ToString());
+                            Message("Unhandled element kind: " + element.Kind);
                             break;
                     }
                     if (cItem == null)
@@ -549,10 +575,7 @@ namespace NamingFix
                 else
                 {
                     baseType = new T {IsSystem = true, Element = element, Name = element.Name};
-                    if (element.Kind == vsCMElement.vsCMElementClass)
-                        _IterateCodeElements(((CodeClass2)element).Members, baseType);
-                    else
-                        _IterateCodeElements(((CodeInterface2)element).Members, baseType);
+                    _IterateCodeElements(((CodeType)element).Members, baseType);
                     _SysClassCache.Add(element.FullName, baseType);
                 }
             }
@@ -572,63 +595,42 @@ namespace NamingFix
         #endregion
 
         #region GetNewName
-        private string _GetNewName(CRenameItemMethod func)
+        private string _GetNewName(CRenameItem item, SRenameRule rule)
         {
-            return _GetNewName(func.Name, _RuleSet.Method, func.Access);
-        }
-
-        private string _GetNewName(CRenameItemVariable variable)
-        {
-            if (variable.GetElement().IsConstant)
-                return _GetNewName(variable.Name, _RuleSet.Const, variable.GetElement().Access);
-            return _GetNewName(variable.Name, _RuleSet.Field, variable.GetElement().Access);
-        }
-
-        private string _GetNewName(CRenameItemProperty property)
-        {
-            return _GetNewName(property.Name, _RuleSet.Property, property.GetElement().Access);
-        }
-
-        private string _GetNewName(string name, SRenameRule[] rules, vsCMAccess access)
-        {
-            switch (access)
-            {
-                case vsCMAccess.vsCMAccessPrivate:
-                    return _GetNewName(name, rules[CRenameRuleSet.Priv]);
-                case vsCMAccess.vsCMAccessProtected:
-                    return _GetNewName(name, rules[CRenameRuleSet.Prot]);
-                case vsCMAccess.vsCMAccessPublic:
-                    return _GetNewName(name, rules[CRenameRuleSet.Pub]);
-            }
-            Message("Found unknown access modifier for " + name + " " + access);
-            return name;
-        }
-
-        private string _GetNewName(string theString, SRenameRule rule)
-        {
+            String theString = item.Name;
             if (!String.IsNullOrEmpty(rule.DontChangePrefix) && theString.StartsWith(rule.DontChangePrefix))
                 return theString;
 
+            //Handle fixed names
             if (_RuleSet.FixedNames.Contains(theString))
                 return theString;
 
-            _RemovePrefix(ref theString, rule.Prefix);
+            //Remove prefix if it is already there
+            if (_RemovePrefix(ref theString, rule.Prefix))
+            {
+                //Handle fixed names
+                if (_RuleSet.FixedNames.Contains(theString))
+                    return rule.Prefix + theString;
+            }
 
+            //Check for non-letter prefixes
             if (theString.Length > 1 && _RuleSet.IdStartsWithLetter && !Char.IsLetter(theString, 0))
             {
-                Message("Stripping non-letter prefix: " + theString);
+                if (_RuleSet.RemoveNonLetterPrefixNoReport.IndexOf(theString[0]) < 0)
+                    Remarks.Add(new ItemStringTuple(item, "Stripping non-letter prefix: " + theString));
                 theString = theString.Substring(1);
             }
 
-            if (theString.Length > 1 && Char.IsUpper(theString, 1))
+            //Remove prefixes like "type-prefixes" (iNum -> Num, otherwhise could get Inum)
+            if (theString.Length > 1 && Char.IsLower(theString, 0) && Char.IsUpper(theString, 1))
             {
                 string prefixStripped = theString.Substring(1);
                 string abbrev = _RuleSet.Abbreviations.FirstOrDefault(ab => theString.StartsWith(ab));
-                string checkString = (abbrev == null) ? prefixStripped : prefixStripped.Substring(abbrev.Length);
+                string checkString = (abbrev == null) ? prefixStripped : prefixStripped.Remove(0, abbrev.Length);
                 bool isUpper = checkString.Length == 0 || !checkString.Any(Char.IsLower);
                 if (!isUpper)
                 {
-                    Message("Stripping prefix: " + theString + " -> " + prefixStripped);
+                    Remarks.Add(new ItemStringTuple(item, "Stripping prefix: " + theString + " -> " + prefixStripped));
                     theString = prefixStripped;
                 }
             }
@@ -638,12 +640,12 @@ namespace NamingFix
                 case
                     ENamingStyle.LowerCamelCase:
                     if (rule.Prefix != null && Char.IsLower(rule.Prefix, rule.Prefix.Length - 1))
-                        _ToUpperCamelCase(ref theString);
+                        _ToUpperCamelCase(ref theString, item);
                     else
-                        _ToLowerCamelCase(ref theString);
+                        _ToLowerCamelCase(ref theString, item);
                     break;
                 case ENamingStyle.UpperCamelCase:
-                    _ToUpperCamelCase(ref theString);
+                    _ToUpperCamelCase(ref theString, item);
                     break;
                 case ENamingStyle.UpperCase:
                     theString = theString.ToUpper();
@@ -674,27 +676,40 @@ namespace NamingFix
             return false;
         }
 
-        private void _ToLowerCamelCase(ref String theString)
+        private void _ToLowerCamelCase(ref String theString, CRenameItem item)
         {
-            _ToCamelCase(ref theString);
+            _ToCamelCase(ref theString, item);
             theString = theString.Substring(0, 1).ToLower() + theString.Substring(1);
         }
 
-        private void _ToUpperCamelCase(ref String theString)
+        private void _ToUpperCamelCase(ref String theString, CRenameItem item)
         {
             theString = theString.Substring(0, 1).ToUpper() + theString.Substring(1);
-            _ToCamelCase(ref theString);
+            _ToCamelCase(ref theString, item);
         }
 
-        private void _ToCamelCase(ref String theString)
+        private void _ToCamelCase(ref String theString, CRenameItem item)
         {
-            string input = theString;
             theString = theString.Replace("__", "_");
+            string input = theString;
             theString = _ReMultiCaps.Replace(theString, m =>
                 {
-                    if (_RuleSet.Abbreviations.Any(abbrev => abbrev.StartsWith(m.Value)))
+                    string abbrev = _RuleSet.Abbreviations.FirstOrDefault(abb => m.Value.StartsWith(abb));
+                    if (abbrev != null)
+                    {
+                        //More uppercase chars then in abbrev --> allow only 1 more
+                        if (m.Value.Length > abbrev.Length + 1)
+                            return m.Value.Substring(0, abbrev.Length) + m.Value.Substring(abbrev.Length).ToLower();
                         return m.Value;
-                    Message("Possible abbreviation: " + m.Value + " in " + input);
+                    }
+                    //Allow partial abbrevs like MP3 (would only match "MP")
+                    abbrev = _RuleSet.PartialAbbreviations.FirstOrDefault(abb => abb.StartsWith(m.Value));
+                    if (abbrev != null)
+                    {
+                        if (input.Substring(m.Index).StartsWith(abbrev))
+                            return m.Value;
+                    }
+                    Remarks.Add(new ItemStringTuple(item, "Possible abbreviation: " + m.Value + " in " + input));
                     return m.Value[0] + m.Value.Substring(1).ToLower();
                 });
             theString = _ReUnderScore.Replace(theString, m => m.Value[1].ToString().ToUpper());
@@ -711,7 +726,43 @@ namespace NamingFix
         #region SetNewNames
         private void _SetNewName(CRenameItem item, SRenameRule rule)
         {
-            item.NewName = _GetNewName(item.Name, rule);
+            item.NewName = _GetNewName(item, rule);
+        }
+
+        private void _SetNewName(CRenameItem item, SRenameRule[] rules, vsCMAccess access)
+        {
+            switch (access)
+            {
+                case vsCMAccess.vsCMAccessPrivate:
+                    _SetNewName(item, rules[CRenameRuleSet.Priv]);
+                    break;
+                case vsCMAccess.vsCMAccessProtected:
+                    _SetNewName(item, rules[CRenameRuleSet.Prot]);
+                    break;
+                case vsCMAccess.vsCMAccessPublic:
+                case vsCMAccess.vsCMAccessProject:
+                    _SetNewName(item, rules[CRenameRuleSet.Pub]);
+                    break;
+                default:
+                    Message("Found unknown access modifier for " + item.Name + " " + access);
+                    break;
+            }
+        }
+
+        private void _SetNewName(CRenameItemMethod func)
+        {
+            _SetNewName(func, _RuleSet.Method, func.Access);
+        }
+
+        private void _SetNewName(CRenameItemVariable variable)
+        {
+            SRenameRule[] rules = (variable.GetElement().IsConstant) ? _RuleSet.Const : _RuleSet.Field;
+            _SetNewName(variable, rules, variable.GetElement().Access);
+        }
+
+        private void _SetNewName(CRenameItemProperty property)
+        {
+            _SetNewName(property, _RuleSet.Property, property.GetElement().Access);
         }
 
         private bool _SetNewName(CRenameItem item)
@@ -740,15 +791,15 @@ namespace NamingFix
                     _SetNewName(item, _RuleSet.LokalVariable);
             }
             else if (item is CRenameItemVariable)
-                item.NewName = _GetNewName((CRenameItemVariable)item);
+                _SetNewName((CRenameItemVariable)item);
             else if (item is CRenameItemProperty)
-                item.NewName = _GetNewName((CRenameItemProperty)item);
+                _SetNewName((CRenameItemProperty)item);
             else if (item is CRenameItemEnumMember)
                 _SetNewName(item, _RuleSet.EnumMember);
             else if (item is CRenameItemParameter)
                 _SetNewName(item, _RuleSet.Parameter);
             else if (item is CRenameItemMethod)
-                item.NewName = _GetNewName((CRenameItemMethod)item);
+                _SetNewName((CRenameItemMethod)item);
             return true;
             // ReSharper restore CanBeReplacedWithTryCastAndCheckForNull
         }
@@ -872,7 +923,7 @@ namespace NamingFix
                 msg = " as another identifier with the same name already exists or is about to be renamed to the same name!";
             }
             string name = item.Name;
-            _AddParentName(ref name, item);
+            CUtils.AddParentName(ref name, item);
             Conflicts.Add(new ItemTuple(item, conflictItem));
             Message("Cannot rename " + item.GetTypeName() + " " + name + " to " + item.NewName + msg);
             return true;

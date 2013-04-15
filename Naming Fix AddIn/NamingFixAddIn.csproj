@@ -55,12 +55,20 @@
     </Reference>
     <Reference Include="System" />
     <Reference Include="System.Core" />
+    <Reference Include="System.Data" />
     <Reference Include="System.Drawing" />
     <Reference Include="System.Windows.Forms" />
+    <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
     <Compile Include="AssemblyInfo.cs">
       <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="CFormRemarks.cs">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="CFormRemarks.Designer.cs">
+      <DependentUpon>CFormRemarks.cs</DependentUpon>
     </Compile>
     <Compile Include="CFormStatus.cs">
       <SubType>Form</SubType>
@@ -93,6 +101,9 @@
     <Compile Include="GlobalSuppressions.cs" />
   </ItemGroup>
   <ItemGroup>
+    <EmbeddedResource Include="CFormRemarks.resx">
+      <DependentUpon>CFormRemarks.cs</DependentUpon>
+    </EmbeddedResource>
     <EmbeddedResource Include="CFormStatus.resx">
       <DependentUpon>CFormStatus.cs</DependentUpon>
     </EmbeddedResource>

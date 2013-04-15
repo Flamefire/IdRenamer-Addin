@@ -30,7 +30,7 @@
         {
             this.lblText = new System.Windows.Forms.Label();
             this.pbMain = new System.Windows.Forms.ProgressBar();
-            this.label1 = new System.Windows.Forms.Label();
+            this.lblAction = new System.Windows.Forms.Label();
             this.label2 = new System.Windows.Forms.Label();
             this.pbSub = new System.Windows.Forms.ProgressBar();
             this.btnAbort = new System.Windows.Forms.Button();
@@ -58,18 +58,18 @@
             this.pbMain.UseWaitCursor = true;
             this.pbMain.Value = 50;
             // 
-            // label1
+            // lblAction
             // 
-            this.label1.Anchor = ((System.Windows.Forms.AnchorStyles)(((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Left) 
+            this.lblAction.Anchor = ((System.Windows.Forms.AnchorStyles)(((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Left) 
             | System.Windows.Forms.AnchorStyles.Right)));
-            this.label1.Font = new System.Drawing.Font("Microsoft Sans Serif", 10.25F);
-            this.label1.Location = new System.Drawing.Point(3, 9);
-            this.label1.Name = "label1";
-            this.label1.Size = new System.Drawing.Size(489, 18);
-            this.label1.TabIndex = 2;
-            this.label1.Text = "Applying given name sheme";
-            this.label1.TextAlign = System.Drawing.ContentAlignment.MiddleCenter;
-            this.label1.UseWaitCursor = true;
+            this.lblAction.Font = new System.Drawing.Font("Microsoft Sans Serif", 10.25F);
+            this.lblAction.Location = new System.Drawing.Point(3, 9);
+            this.lblAction.Name = "lblAction";
+            this.lblAction.Size = new System.Drawing.Size(489, 18);
+            this.lblAction.TabIndex = 2;
+            this.lblAction.Text = "Applying given name sheme";
+            this.lblAction.TextAlign = System.Drawing.ContentAlignment.MiddleCenter;
+            this.lblAction.UseWaitCursor = true;
             // 
             // label2
             // 
@@ -101,6 +101,7 @@
             this.btnAbort.TabIndex = 5;
             this.btnAbort.Text = "Abort";
             this.btnAbort.UseVisualStyleBackColor = true;
+            this.btnAbort.UseWaitCursor = true;
             this.btnAbort.Click += new System.EventHandler(this._BtnAbortClick);
             // 
             // CFormStatus
@@ -112,7 +113,7 @@
             this.Controls.Add(this.btnAbort);
             this.Controls.Add(this.pbSub);
             this.Controls.Add(this.label2);
-            this.Controls.Add(this.label1);
+            this.Controls.Add(this.lblAction);
             this.Controls.Add(this.pbMain);
             this.Controls.Add(this.lblText);
             this.FormBorderStyle = System.Windows.Forms.FormBorderStyle.FixedDialog;
@@ -131,9 +132,9 @@
 
         public System.Windows.Forms.Label lblText;
         public System.Windows.Forms.ProgressBar pbMain;
-        private System.Windows.Forms.Label label1;
         private System.Windows.Forms.Label label2;
         public System.Windows.Forms.ProgressBar pbSub;
         private System.Windows.Forms.Button btnAbort;
+        public System.Windows.Forms.Label lblAction;
     }
 }

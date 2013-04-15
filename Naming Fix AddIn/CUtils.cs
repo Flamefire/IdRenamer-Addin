@@ -81,8 +81,20 @@ namespace NamingFix
                 return ((CodeType)objCodeElement).Members;
             if (objCodeElement is CodeFunction)
                 return ((CodeFunction)objCodeElement).Parameters;
+            if (objCodeElement is CodeDelegate)
+                return ((CodeDelegate)objCodeElement).Parameters;
             return null;
             // ReSharper restore CanBeReplacedWithTryCastAndCheckForNull
+        }
+
+        public static void AddParentName(ref String name, CRenameItem item)
+        {
+            if (item.Parent == null || String.IsNullOrEmpty(item.Parent.Name))
+                return;
+            if (item.Parent is CRenameItemType || item.Parent is CRenameItemNamespace)
+                name = item.Parent.Name + "." + name;
+            else
+                name += " in " + item.Parent.Name;
         }
     }
 }
