@@ -179,33 +179,33 @@ namespace NamingFix
         {
             _Strings.Clear();
             _Comments.Clear();
+            text = _ReCommentSl.Replace(text, delegate(Match m)
+            {
+                _Comments.Add(m.Value);
+                return "//ReplacedCom:::" + (_Comments.Count - 1) + ":::;\r\n";
+            });
+            text = _ReCommentMl.Replace(text, delegate(Match m)
+            {
+                _Comments.Add(m.Value);
+                return "//ReplacedCom:::" + (_Comments.Count - 1) + ":::;\r\n";
+            });
+            text = _ReVarbatimString.Replace(text, delegate(Match m)
+            {
+                _Strings.Add(m.Value);
+                return "\"ReplacedStr:::" + (_Strings.Count - 1) + ":::\"";
+            });
             text = _ReString.Replace(text, delegate(Match m)
                 {
                     _Strings.Add(m.Value);
                     return "\"ReplacedStr:::" + (_Strings.Count - 1) + ":::\"";
                 });
-            text = _ReVarbatimString.Replace(text, delegate(Match m)
-                {
-                    _Strings.Add(m.Value);
-                    return "\"ReplacedStr:::" + (_Strings.Count - 1) + ":::\"";
-                });
-            text = _ReCommentSl.Replace(text, delegate(Match m)
-                {
-                    _Comments.Add(m.Value);
-                    return "//ReplacedCom:::" + (_Comments.Count - 1) + ":::;\r\n";
-                });
-            text = _ReCommentMl.Replace(text, delegate(Match m)
-                {
-                    _Comments.Add(m.Value);
-                    return "//ReplacedCom:::" + (_Comments.Count - 1) + ":::;\r\n";
-                });
         }
 
         private void _RestoreTextComments(ref String text)
         {
-            for (int i = 0; i < _Strings.Count; i++)
+            for (int i = _Strings.Count - 1; i >= 0; i++)
                 text = text.Replace("\"ReplacedStr:::" + i + ":::\"", _Strings[i]);
-            for (int i = 0; i < _Comments.Count; i++)
+            for (int i = _Comments.Count - 1; i >= 0; i++)
                 text = text.Replace("//ReplacedCom:::" + i + ":::;\r\n", _Comments[i]);
         }
 
